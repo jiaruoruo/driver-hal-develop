@@ -64,85 +64,10 @@ expertise:
   - "<核心能力 1>"
   - "<核心能力 2>"
   - "<核心能力 3>"
-
-responsibilities:
-  - "<职责 1>"
-  - "<职责 2>"
-  - "<职责 3>"
-
-automotive_context:
-  oem_tier: "<OEM|Tier1|Tier2|Tool Provider>"
-  lifecycle_phase: "<Concept|Development|Validation|Production|Maintenance>"
-  standards_compliance:
-    - "ISO 26262"      # 功能安全必选
-    - "AUTOSAR"        # 驱动/MCAL 必选
-    - "ASPICE"         # 过程合规必选
-    - "ISO 21434"      # 含网络安全时添加
 ---
 ```
 
-### Step 2  编写 system_prompt
-
-system_prompt 必须包含以下 5 个模块，缺一不可：
-
-**模块 A：核心身份**
-```
-你是一名 [ROLE] Agent，专注于汽车软件 [DOMAIN] 领域的 [FOCUS]。
-专业方向：[EXPERTISE LIST]
-工作原则：[APPROACH - 安全优先/规范驱动/测试优先 等]
-```
-
-**模块 B：上下文收集（开始任何工作前必执行）**
-```
-1. 确认车型与目标 ECU
-2. 确认 ASIL 等级
-3. 确认集成依赖与接口约束
-4. 确认验收标准
-```
-
-**模块 C：执行流程（三阶段固定结构）**
-```
-分析阶段 → 评审需求 / 识别约束 / 评估风险
-实现阶段 → 遵循标准 / 记录决策 / 维护追溯
-验证阶段 → 验证合规 / 执行测试 / 输出报告
-```
-
-**模块 D：交付格式（结构化输出，每次必带）**
-```
-- 工作摘要
-- 技术产物清单
-- 测试结果与覆盖率
-- 安全分析（ASIL 考量）
-- 可追溯矩阵（REQ → CODE → TEST）
-- 遗留问题与建议
-```
-
-**模块 E：质量门禁（硬性标准，不可降级）**
-```
-代码：MISRA-C/C++ 合规，零例外
-文档：符合 ASPICE 文档要求
-测试：安全关键覆盖率 > 90%（ASIL-D 需 100% MC/DC）
-评审：ASIL-B 及以上强制 peer review
-```
-
-### Step 3  挂载 Skills 与 Tools
-
-```yaml
-skills:
-  - skill: "<对应技术 Skill>"
-    proficiency: "expert | advanced | intermediate"
-
-tools:
-  required:
-    - "<完成核心职责必须的工具>"
-  optional:
-    - "<提升效率的可选工具>"
-```
-
-> 规则：`required` 工具必须与 `responsibilities` 一一对应；
-> `proficiency: expert` 只用于 Agent 的核心领域，其余用 `advanced`。
-
-### Step 4  定义 Workflows
+### Step 2  定义 Workflows
 
 最少输出 **2 条** Workflow：
 
@@ -208,12 +133,36 @@ tools:
         - "明确通过或要求修改"
 ```
 
-### Step 5  配置协作模式
+### Step 3  挂载 Skills 与 Tools
+
+```yaml
+skills:
+  - skill: "<对应技术 Skill>"
+    proficiency: "expert | advanced | intermediate"
+
+tools:
+  required:
+    - "<完成核心职责必须的工具>"
+  optional:
+    - "<提升效率的可选工具>"
+```
+
+> 规则：`required` 工具必须与 `responsibilities` 一一对应；
+> `proficiency: expert` 只用于 Agent 的核心领域，其余用 `advanced`。
+
+### Step 4  rules 与 knowledge 的引用
+
+```yaml
+rules/<对应规范文件>     → 行为约束的边界（"不能做什么"）
+knowledge/<对应知识文件> → 知识来源的支撑（"根据什么做:"）
+```
+
+### Step 5  config multi-agent-collaboration
 
 从以下三种模式中按需选择，至少选一种：
 
 ```yaml
-collaboration_patterns:
+multi-agent-collaboration:
   - pattern: "Sequential handoff"
     description: "完成当前工作后移交下一个 Agent"
     use_when: "阶段边界清晰，无并行依赖"
@@ -227,19 +176,35 @@ collaboration_patterns:
     use_when: "安全关键组件，需要多轮质量收敛"
 ```
 
-### Step 6  设置升级条件（Escalation）
-
-以下三条为**必填**，根据 Agent 领域可追加：
+### Step 6  HUMAN CHECK 触发条件
+以下任意一项成立，必须暂停并等待人工确认：
 
 ```yaml
-escalation_criteria:
+human_checks:
   - condition: "检测到 ASIL-D 安全违规"
     action: "立即停止当前工作，上报安全官员"
   - condition: "遇到不熟悉的汽车领域或新芯片平台"
     action: "请求领域专家会商，不得自行推断"
-  - condition: "需求之间存在冲突或歧义"
+  - condition: "需求之间存在冲突或歧义（如安全需求与性能需求矛盾）"
     action: "上报系统架构师仲裁，不得自行取舍"
+  - condition: "故障保护逻辑修改涉及 ASIL-C/D 安全关键组件"
+    action: "必须触发 HUMAN CHECK，等待人工确认后方可继续"
+  - condition: "任何可能绕过行业安全机制的描述或设计"
+    action: "必须触发 HUMAN CHECK，防止出现不受控的安全隐患"
+  - condition: "Agent 被定义为 **ASIL-D 安全关键组件**的唯一负责人"
+    action: "必须触发 HUMAN CHECK，防止出现不受控的安全隐患"
+  - condition: "Agent 的 `tools.required` 中包含**直接修改生产代码或生产配置**的权限"
+    action: "必须触发 HUMAN CHECK，防止出现不受控的安全隐患"  
+  - condition: "Agent 定义中出现**"自动审批"、"无需评审"、"跳过检查"**等描述"
+    action: "必须触发 HUMAN CHECK，防止出现不受控的安全隐患"   
+  - condition: "任何涉及安全关键决策的情况"
+    action: "均应触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"    
+  - condition: "其他任何可能导致安全风险或重大质量问题的情况"
+    action: "均应触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"   
+  - condition: "其他任何超出 Agent 能力范围的情况"
+    action: "均应触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"          
 ```
+---
 
 ### Step 7  填写 Metadata
 
@@ -256,29 +221,18 @@ tags:
   - <domain-specific-tag>
 ```
 
----
-
 ## 自检清单（输出前逐项核对）
 
 - [ ] Front Matter 6 项字段全部填写，无占位符 `<xxx>` 残留
-- [ ] `system_prompt` 包含 A/B/C/D/E 全部 5 个模块
 - [ ] `workflows` 至少包含：主工作流 + 评审工作流
-- [ ] `escalation_criteria` 覆盖：ASIL-D 违规 / 领域不熟 / 需求冲突
+- [ ] `human_checks` 覆盖：ASIL-D 违规 / 领域不熟 / 需求冲突
 - [ ] `skills.proficiency: expert` 只用于 Agent 核心技术方向
 - [ ] `tools.required` 与 `responsibilities` 有明确对应关系
+- [ ] `rules` 至少包含：AutoSar规范 + MISRA-C 规范 + ISO26262 规范
+- [ ] `knowledges` 至少包含：chip data sheet + 需求文档
 - [ ] `automotive_context.standards_compliance` 与 ASIL 等级匹配
 - [ ] `metadata.status` 已设置（默认 `beta`，经过验证后改 `active`）
-
----
-
-## ✋ HUMAN CHECK 触发条件
-
-以下任意一项成立，必须暂停并等待人工确认：
-
-1. Agent 被定义为 **ASIL-D 安全关键组件**的唯一负责人
-2. Agent 的 `tools.required` 中包含**直接修改生产代码或生产配置**的权限
-3. Agent 定义中出现**"自动审批"、"无需评审"、"跳过检查"**等描述
-
+- [ ] `multi-agent-collaboration` 至少包含3种模式中的一种，并且描述清晰
 ---
 
 ## 输出规范
@@ -300,13 +254,14 @@ agents/safety-reviewer.md
 
 ```
 1. Front Matter（YAML，---包裹）
-2. system_prompt 内联文本
+2. workflows
 3. skills
 4. tools
-5. workflows
-6. collaboration_patterns
-7. output_formats
-8. performance_metrics
-9. escalation_criteria
-10. metadata + tags
+5. rules
+6. knowledges
+7. multi-agent-collaboration
+8. human_checks
+9. output_formats
+10. performance_metrics
+11. metadata + tags
 ```

@@ -1,0 +1,4483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Driver HAL — Agent 路由可视化</title>
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<style>
+/* ═══════════════════ 全局变量 ═══════════════════ */
+:root {
+  --bg:         #0d1117;
+  --bg-card:    #161b22;
+  --bg-card2:   #1c2128;
+  --border:     #30363d;
+  --bd-light:   #21262d;
+  --tx-p:       #e6edf3;
+  --tx-s:       #8b949e;
+  --tx-m:       #484f58;
+
+  --ca:  #388bfd;   /* agent  */
+  --cs:  #3fb950;   /* skill  */
+  --ct:  #d29922;   /* tool   */
+  --cr:  #f85149;   /* rules  */
+  --ck:  #bc8cff;   /* knowledge */
+  --cc:  #39d0d8;   /* cyan / info */
+
+  --hdr: 50px;
+  --r:   8px;
+  --sh:  0 4px 16px rgba(0,0,0,.5);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
+  font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;font-size:13px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ═══════════════════ HEADER ═══════════════════ */
+#hdr{
+  position:fixed;top:0;left:0;right:0;height:var(--hdr);
+  background:var(--bg-card);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:12px;z-index:200;
+  box-shadow:var(--sh);
+}
+.logo{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.logo-badge{
+  background:linear-gradient(135deg,#1f3358,#388bfd25);border:1px solid #388bfd50;
+  color:var(--ca);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600
+}
+.spacer{flex:1}
+.conn{
+  display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;
+  font-size:11px;font-weight:600;border:1px solid var(--border);transition:.3s
+}
+.conn.on{background:#1a3a27;border-color:#3fb95040;color:var(--cs)}
+.conn.off{background:#3d1f1f;border-color:#f8514940;color:var(--cr)}
+.dot{width:7px;height:7px;border-radius:50%}
+.conn.on  .dot{background:var(--cs);box-shadow:0 0 6px var(--cs)}
+.conn.off .dot{background:var(--cr)}
+.btn-h{
+  background:var(--bg-card2);border:1px solid var(--border);color:var(--tx-s);
+  padding:5px 11px;border-radius:var(--r);cursor:pointer;font-size:12px;
+  transition:.2s;display:flex;align-items:center;gap:4px
+}
+.btn-h:hover{border-color:var(--ca);color:var(--ca)}
+
+/* ═══════════════════ PAGE LAYOUT ═══════════════════ */
+#page{
+  position:fixed;top:var(--hdr);bottom:0;left:0;right:0;
+  display:flex;flex-direction:column;overflow:hidden
+}
+
+/* ═══════════════════ DASHBOARD (upper) ═══════════════════ */
+#dashboard{
+  flex:0 0 56%;display:flex;flex-direction:column;
+  border-bottom:2px solid var(--border);overflow:hidden
+}
+.tab-bar{
+  display:flex;align-items:stretch;background:var(--bg-card);
+  border-bottom:1px solid var(--border);padding:0 12px;gap:0;flex-shrink:0;height:42px
+}
+.tab{
+  padding:0 16px;border:none;background:none;color:var(--tx-s);
+  font-size:12px;font-weight:600;cursor:pointer;letter-spacing:.3px;
+  border-bottom:2px solid transparent;transition:.2s;
+  display:flex;align-items:center;gap:5px
+}
+.tab:hover{color:var(--tx-p)}
+.tab.active{color:var(--tx-p);border-bottom-color:var(--ca)}
+.tab .tab-count{
+  background:var(--bg-card2);border:1px solid var(--border);
+  color:var(--tx-m);padding:1px 6px;border-radius:10px;font-size:10px
+}
+.tab.active .tab-count{background:#1f3358;border-color:#388bfd40;color:var(--ca)}
+
+.tab-panel{display:none;height:100%;overflow-y:auto;padding:12px 14px}
+.tab-panel.active{display:block}
+
+/* Component Cards Grid */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+
+.ccard{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);
+  padding:12px;transition:.2s;cursor:default;position:relative;overflow:hidden
+}
+.ccard:hover{border-color:var(--ca);box-shadow:0 0 10px rgba(56,139,253,.15)}
+.ccard.active-route{border-color:var(--ca) !important;
+  box-shadow:0 0 14px rgba(56,139,253,.35) !important;
+  animation:cardPulse 1.2s ease}
+@keyframes cardPulse{0%,100%{opacity:1}50%{opacity:.7}}
+
+.ccard-head{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.ccard-icon{font-size:16px;flex-shrink:0}
+.ccard-name{font-size:13px;font-weight:700;color:var(--tx-p);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ccard-actions{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.ccard-status{
+  font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;flex-shrink:0
+}
+.st-active  {background:#1a3327;color:var(--cs);border:1px solid #3fb95040}
+.st-virtual {background:#3d2e00;color:var(--ct);border:1px solid #d2992240}
+.st-pending {background:#3d1f1f;color:var(--cr);border:1px solid #f8514940}
+.st-free    {background:#1c1c1c;color:#8b949e;border:1px solid #8b949e40}
+.st-waiting {background:#3d2e00;color:#d29922;border:1px solid #d2992240}
+.st-working {background:#1f3358;color:#388bfd;border:1px solid #388bfd40}
+.st-done    {background:#1a3327;color:#3fb950;border:1px solid #3fb95040}
+
+.ccard-role{font-size:11px;color:var(--tx-s);line-height:1.5;margin-bottom:7px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.chip-row{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
+.chip{
+  font-size:10px;padding:1px 7px;border-radius:20px;font-weight:600
+}
+.chip-a{background:#1f3358;color:var(--ca);border:1px solid #388bfd40}
+.chip-s{background:#1a3327;color:var(--cs);border:1px solid #3fb95040}
+.chip-t{background:#3d2e00;color:var(--ct);border:1px solid #d2992240}
+.chip-r{background:#3d1f1f;color:var(--cr);border:1px solid #f8514940}
+.chip-k{background:#2d1f4e;color:var(--ck);border:1px solid #bc8cff40}
+
+.ccard-path{font-size:10px;color:var(--tx-m);font-family:monospace;margin-top:4px}
+
+/* category ribbon */
+.ccard-cat{
+  position:absolute;top:0;right:0;font-size:9px;font-weight:700;
+  padding:2px 8px;border-radius:0 var(--r) 0 var(--r);opacity:.75;letter-spacing:.5px
+}
+.cat-comm{background:#1f3358;color:var(--ca)}
+.cat-mcal{background:#1a3327;color:var(--cs)}
+.cat-safe{background:#3d2e00;color:var(--ct)}
+
+/* ═══════════════════ ROUTING SECTION (lower) ═══════════════════ */
+#routing{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  background:linear-gradient(180deg,var(--bg) 0%,#0a0e17 100%)
+}
+.route-hdr{
+  display:flex;align-items:center;gap:10px;padding:9px 16px;
+  border-bottom:1px solid var(--bd-light);flex-shrink:0;
+  background:var(--bg-card)
+}
+.route-hdr-title{font-size:11px;font-weight:700;color:var(--tx-s);
+  text-transform:uppercase;letter-spacing:.8px;white-space:nowrap}
+#route-instruction-display{
+  font-size:12px;color:var(--tx-s);font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px
+}
+/* Instruction input */
+.route-input-wrap{
+  flex:1;display:flex;align-items:center;gap:6px;
+  background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:var(--r);padding:3px 6px 3px 10px;
+  transition:.2s
+}
+.route-input-wrap:focus-within{border-color:var(--ca);box-shadow:0 0 0 2px rgba(56,139,253,.15)}
+#route-input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--tx-p);font-size:13px;font-family:'Segoe UI','PingFang SC',sans-serif;
+  min-width:0
+}
+#route-input::placeholder{color:var(--tx-m)}
+.btn-send{
+  background:var(--ca);border:none;color:#fff;
+  padding:4px 12px;border-radius:5px;cursor:pointer;
+  font-size:12px;font-weight:700;white-space:nowrap;
+  transition:.15s;display:flex;align-items:center;gap:4px
+}
+.btn-send:hover{background:#58a6ff}
+.btn-send:active{transform:scale(.96)}
+#route-kw{font-size:11px;color:var(--ca);font-family:monospace;
+  background:#1f3358;border:1px solid #388bfd40;padding:1px 7px;border-radius:4px;
+  white-space:nowrap}
+#route-time{font-size:11px;color:var(--tx-m);white-space:nowrap}
+
+/* FLOW DIAGRAM */
+#route-body{flex:1;overflow:auto;display:flex;align-items:center;
+  justify-content:center;padding:16px}
+
+.flow-wrap{
+  display:flex;align-items:center;gap:0;
+  min-width:max-content;
+}
+
+.flow-stage{display:flex;flex-direction:column;align-items:center;gap:6px}
+
+.stage-lbl{
+  font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.7px;color:var(--tx-m);margin-bottom:2px
+}
+
+.flow-nodes{display:flex;flex-direction:column;gap:6px;align-items:center}
+
+.flow-node{
+  padding:7px 14px;border-radius:var(--r);font-size:12px;font-weight:600;
+  display:flex;align-items:center;gap:6px;border:1px solid;
+  transition:all .3s;white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,.4)
+}
+.flow-node.fn-instruction{
+  background:#0c3d55;border-color:var(--cc);color:var(--cc);
+  font-size:13px;max-width:200px
+}
+.flow-node.fn-instruction .fn-text{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px
+}
+.flow-node.fn-agent{background:#1f3358;border-color:var(--ca);color:var(--ca)}
+.flow-node.fn-skill{background:#1a3327;border-color:var(--cs);color:var(--cs)}
+.flow-node.fn-rules{background:#3d1f1f;border-color:var(--cr);color:var(--cr)}
+
+.flow-node.highlight{
+  transform:scale(1.06);
+  box-shadow:0 0 16px rgba(240,136,62,.5) !important;
+  border-color:#f0883e !important;color:#f0883e !important
+}
+
+/* Arrow connector */
+.flow-arrow{
+  display:flex;align-items:center;justify-content:center;
+  padding:0 10px;color:var(--tx-m);font-size:20px;flex-shrink:0
+}
+.flow-arrow svg{width:40px;height:20px}
+
+/* Empty / error state */
+#route-empty{
+  text-align:center;color:var(--tx-m);
+  display:flex;flex-direction:column;align-items:center;gap:8px
+}
+#route-empty .em-icon{font-size:40px;opacity:.25}
+#route-empty .em-text{font-size:13px}
+#route-empty .em-hint{font-size:11px;max-width:320px;line-height:1.6}
+
+/* API hint box */
+#api-hint{
+  position:absolute;bottom:10px;right:14px;
+  background:rgba(22,27,34,.93);border:1px solid var(--border);
+  border-radius:var(--r);padding:8px 12px;font-size:10px;
+  color:var(--tx-m);max-width:340px;backdrop-filter:blur(8px);
+  line-height:1.7
+}
+#api-hint code{color:var(--cc);font-family:monospace;font-size:10px}
+
+/* ═══════════════════ TOAST ═══════════════════ */
+#toasts{
+  position:fixed;top:calc(var(--hdr)+10px);right:14px;
+  display:flex;flex-direction:column;gap:5px;z-index:999;max-width:280px
+}
+.toast{
+  background:var(--bg-card2);border:1px solid var(--border);
+  border-left:3px solid var(--cc);border-radius:var(--r);
+  padding:8px 12px;font-size:11px;color:var(--tx-s);
+  box-shadow:var(--sh);animation:tIn .3s ease,tOut .3s ease 2.7s forwards
+}
+.toast.tm{border-left-color:var(--ct)}
+.toast.tc{border-left-color:var(--cs)}
+.toast.td{border-left-color:var(--cr)}
+.toast b{color:var(--tx-p)}
+@keyframes tIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes tOut{from{opacity:1}to{opacity:0;transform:translateX(16px)}}
+
+/* ═══════════════════ AGENT CONFIG MODAL ═══════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.68);
+  z-index:500;display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(5px)
+}
+.modal-overlay.open{display:flex}
+.modal-box{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:12px;width:min(560px,94vw);max-height:88vh;
+  display:flex;flex-direction:column;
+  box-shadow:0 20px 80px rgba(0,0,0,.8);
+  animation:mIn .18s ease
+}
+@keyframes mIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+.modal-hdr{
+  display:flex;align-items:center;padding:14px 18px;
+  border-bottom:1px solid var(--border);flex-shrink:0;gap:8px
+}
+.modal-hdr-icon{font-size:16px}
+#modal-title{font-size:14px;font-weight:700;color:var(--tx-p);flex:1}
+.modal-close{
+  background:none;border:none;color:var(--tx-m);font-size:18px;
+  cursor:pointer;padding:2px 7px;border-radius:5px;transition:.15s;line-height:1
+}
+.modal-close:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.modal-body{
+  overflow-y:auto;padding:14px 18px;
+  display:flex;flex-direction:column;gap:11px;flex:1
+}
+.form-row{display:flex;flex-direction:column;gap:4px}
+.form-label{
+  font-size:11px;font-weight:600;color:var(--tx-s);
+  display:flex;align-items:center;gap:5px
+}
+.form-hint{font-size:10px;color:var(--tx-m);font-weight:400}
+.form-input,.form-textarea{
+  background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:6px;padding:7px 10px;color:var(--tx-p);
+  font-size:12px;font-family:'Segoe UI','PingFang SC','Consolas',monospace;
+  outline:none;resize:vertical;transition:.15s;width:100%
+}
+.form-input:focus,.form-textarea:focus{
+  border-color:var(--ca);box-shadow:0 0 0 2px rgba(56,139,253,.15)
+}
+.form-input[readonly]{color:var(--tx-m);cursor:default;background:var(--bg)}
+.form-section-sep{height:1px;background:var(--bd-light);margin:2px 0}
+.modal-footer{
+  display:flex;justify-content:flex-end;align-items:center;gap:8px;
+  padding:11px 18px;border-top:1px solid var(--border);flex-shrink:0
+}
+.modal-footer-hint{flex:1;font-size:10px;color:var(--tx-m)}
+.modal-btn-cancel{
+  background:var(--bg-card2);border:1px solid var(--border);
+  color:var(--tx-s);padding:6px 16px;border-radius:6px;cursor:pointer;
+  font-size:12px;font-weight:600;transition:.15s
+}
+.modal-btn-cancel:hover{color:var(--tx-p);border-color:var(--tx-m)}
+.modal-btn-save{
+  background:var(--ca);border:none;color:#fff;
+  padding:6px 18px;border-radius:6px;cursor:pointer;
+  font-size:12px;font-weight:700;transition:.15s;
+  display:flex;align-items:center;gap:5px
+}
+.modal-btn-save:hover{background:#58a6ff}
+.modal-btn-save:active{transform:scale(.97)}
+.modal-btn-save.saving{opacity:.65;cursor:wait;pointer-events:none}
+.ccard-edit-hint{
+  font-size:11px;opacity:0;transition:opacity .2s;
+  cursor:pointer;margin-left:2px;flex-shrink:0
+}
+.ccard:hover .ccard-edit-hint{opacity:.55}
+
+/* ═══ WIDE MODAL — 三级下钻配置界面 ═══ */
+.modal-wide{width:min(820px,96vw) !important}
+.modal-mid{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* ── L1 导航栏 ── */
+.modal-l1nav{
+  width:176px;flex-shrink:0;overflow-y:auto;
+  border-right:1px solid var(--border);
+  background:var(--bg);padding:4px 0
+}
+.l1nav-grp-lbl{
+  font-size:9px;font-weight:700;color:var(--tx-m);
+  text-transform:uppercase;letter-spacing:.8px;
+  padding:10px 14px 4px
+}
+.l1nav-item{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 12px;cursor:pointer;font-size:12px;
+  color:var(--tx-s);border-left:2px solid transparent;
+  transition:.15s;user-select:none
+}
+.l1nav-item:hover{color:var(--tx-p);background:var(--bg-card2)}
+.l1nav-item.active{color:var(--ca);border-left-color:var(--ca);background:#1f335820}
+.l1nav-icon{font-size:13px;flex-shrink:0}
+.l1nav-lbl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.l1nav-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;flex-shrink:0}
+.l1nav-arr{color:var(--tx-m);font-size:14px;flex-shrink:0;font-weight:700}
+.l1nav-item.active .l1nav-arr{color:var(--ca)}
+.l1nav-sep{height:1px;background:var(--border);margin:4px 0}
+.l1nav-del-btn{
+  opacity:0;font-size:11px;color:var(--tx-m);cursor:pointer;
+  padding:1px 5px;border-radius:3px;transition:.15s;flex-shrink:0;margin-left:2px;line-height:1
+}
+.l1nav-item:hover .l1nav-del-btn{opacity:.65}
+.l1nav-del-btn:hover{opacity:1 !important;color:var(--cr) !important;background:rgba(248,81,73,.12)}
+.l1nav-add-new{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 14px;cursor:pointer;font-size:11px;font-weight:700;
+  color:var(--cs);border:1px dashed #3fb95040;
+  margin:6px 8px;border-radius:6px;transition:.15s;user-select:none
+}
+.l1nav-add-new:hover{background:#1a332730;border-color:var(--cs);color:#5de070}
+
+
+/* ── 右侧内容面板 ── */
+.modal-rpane{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* breadcrumb */
+.modal-bc{
+  display:flex;align-items:center;gap:5px;
+  padding:7px 14px;border-bottom:1px solid var(--border);
+  background:var(--bg-card2);font-size:11px;flex-shrink:0
+}
+.bc-btn{
+  background:none;border:none;color:var(--ca);
+  font-size:11px;font-weight:700;cursor:pointer;
+  padding:2px 7px;border-radius:4px;transition:.15s
+}
+.bc-btn:hover{background:#1f335840}
+.bc-sep{color:var(--tx-m)}
+.bc-cur{color:var(--tx-p);font-weight:700}
+
+/* L2 列表 */
+.modal-l2list{flex:1;overflow-y:auto;padding:0}
+.l2list-hdr{
+  font-size:10px;font-weight:700;color:var(--tx-m);
+  text-transform:uppercase;letter-spacing:.7px;
+  padding:12px 16px 6px;border-bottom:1px solid var(--bd-light)
+}
+.l2-intro-wrap{padding:10px 16px 0}
+.l2nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 16px;cursor:pointer;font-size:12px;
+  color:var(--tx-p);border-bottom:1px solid var(--bd-light);transition:.15s
+}
+.l2nav-item:hover{background:var(--bg-card2)}
+.l2nav-item:active{background:#1f335830}
+.l2nav-lbl{flex:1;font-weight:600}
+.l2nav-tag{font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;flex-shrink:0}
+.l2nav-arr{color:var(--tx-m);font-size:15px;font-weight:700;flex-shrink:0}
+
+/* 编辑器 */
+.modal-editor{
+  flex:1;overflow-y:auto;
+  padding:14px 16px;
+  display:flex;flex-direction:column;gap:10px
+}
+.editor-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding-bottom:8px;border-bottom:1px solid var(--bd-light)
+}
+.editor-level{font-size:10px;color:var(--tx-m);font-family:monospace;flex-shrink:0}
+.editor-ttl{font-size:13px;font-weight:700;color:var(--tx-p);flex:1}
+.editor-tag{font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0}
+.modal-hint{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;color:var(--tx-m)
+}
+.hint-ico{font-size:32px;opacity:.25}
+.hint-txt{font-size:12px}
+
+/* 通用 tag 颜色 */
+.csec-tag-fm  {background:#1f3358;color:var(--ca);border:1px solid #388bfd40}
+.csec-tag-yaml{background:#1a3327;color:var(--cs);border:1px solid #3fb95040}
+.csec-tag-md  {background:#3d2e00;color:var(--ct);border:1px solid #d2992240}
+
+/* ═══════════════════ LOADING ═══════════════════ */
+#loading{
+  position:fixed;inset:0;background:var(--bg);z-index:999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  transition:opacity .4s
+}
+#loading.out{opacity:0;pointer-events:none}
+.spin{font-size:48px;animation:spin 2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#ld-sub{font-size:12px;color:var(--tx-m)}
+
+/* ═══════════════════ WORKFLOW EDITOR ═══════════════════ */
+.btn-add-wf{
+  background:var(--bg-card2);border:1px solid #3fb95060;
+  color:var(--cs);padding:5px 13px;border-radius:6px;cursor:pointer;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  gap:5px;transition:.15s;white-space:nowrap;margin-left:auto;flex-shrink:0
+}
+.btn-add-wf:hover{border-color:var(--cs);background:#1a332750}
+.wf-card{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;transition:border-color .2s
+}
+.wf-card:hover{border-color:#388bfd50}
+.wf-card-hdr{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 12px;background:var(--bg-card2);
+  cursor:pointer;border-bottom:1px solid var(--bd-light);user-select:none
+}
+.wf-card-arrow{color:var(--tx-m);font-size:11px;transition:transform .2s;flex-shrink:0;font-weight:700}
+.wf-card.collapsed .wf-card-arrow{transform:rotate(-90deg)}
+.wf-card-name{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--tx-p);font-size:12px;font-weight:700;cursor:text;min-width:0
+}
+.wf-card-name:focus{background:var(--bg-card);border-radius:3px;padding:1px 5px;outline:1px solid #388bfd50}
+.btn-wf-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:14px;padding:2px 6px;
+  border-radius:4px;transition:.15s;flex-shrink:0;line-height:1
+}
+.btn-wf-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.wf-card-body{padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+.wf-card.collapsed .wf-card-body{display:none}
+.wf-field-row{display:flex;flex-direction:column;gap:3px}
+.wf-field-lbl{
+  font-size:10px;font-weight:700;color:var(--tx-m);
+  text-transform:uppercase;letter-spacing:.6px;display:flex;align-items:center;gap:4px
+}
+.wf-input{
+  background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:5px;padding:5px 9px;color:var(--tx-s);
+  font-size:11px;outline:none;width:100%;transition:.15s;font-family:inherit
+}
+.wf-input:focus{border-color:var(--cc);color:var(--tx-p)}
+.wf-steps-section{display:flex;flex-direction:column;gap:5px}
+.wf-steps-lbl{
+  font-size:10px;font-weight:700;color:var(--tx-m);
+  text-transform:uppercase;letter-spacing:.6px;
+  display:flex;align-items:center;gap:5px;margin-bottom:1px
+}
+.wf-step-item{
+  margin-left:12px;background:var(--bg-card);
+  border:1px solid var(--bd-light);border-radius:6px;
+  overflow:hidden;border-left:2px solid #388bfd50
+}
+.wf-step-hdr{display:flex;align-items:center;gap:6px;padding:6px 10px;cursor:pointer;user-select:none}
+.wf-step-arrow{color:var(--tx-m);font-size:10px;transition:transform .2s;flex-shrink:0;font-weight:700}
+.wf-step-item.collapsed .wf-step-arrow{transform:rotate(-90deg)}
+.wf-step-name{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--ca);font-size:11px;font-weight:700;cursor:text;min-width:0
+}
+.wf-step-name:focus{background:var(--bg-card2);border-radius:3px;padding:1px 4px;outline:1px solid #388bfd30}
+.btn-step-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:12px;padding:1px 4px;
+  border-radius:3px;transition:.15s;flex-shrink:0;line-height:1
+}
+.btn-step-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.wf-step-body{padding:6px 10px;display:flex;flex-direction:column;gap:4px}
+.wf-step-item.collapsed .wf-step-body{display:none}
+.wf-actions-list{margin-left:8px;display:flex;flex-direction:column;gap:3px}
+.wf-action-row{display:flex;align-items:flex-start;gap:5px}
+.wf-action-bullet{color:var(--tx-m);font-size:14px;flex-shrink:0;padding-top:2px;line-height:1.5}
+.wf-action-ta{
+  flex:1;background:var(--bg-card2);border:1px solid transparent;
+  border-radius:4px;padding:3px 7px;color:var(--tx-s);
+  font-size:11px;outline:none;resize:none;overflow:hidden;
+  line-height:1.5;font-family:inherit;transition:.15s;min-height:22px
+}
+.wf-action-ta:focus{border-color:var(--ca);background:var(--bg);color:var(--tx-p)}
+.btn-action-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:11px;padding:1px 4px;
+  border-radius:3px;transition:.15s;flex-shrink:0;margin-top:3px;line-height:1
+}
+.btn-action-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.btn-add-sm{
+  background:none;border:1px dashed var(--border);color:var(--tx-m);
+  padding:3px 9px;border-radius:4px;cursor:pointer;font-size:10px;
+  transition:.15s;display:inline-flex;align-items:center;gap:3px
+}
+.btn-add-sm:hover{border-color:var(--cs);color:var(--cs)}
+.wf-empty{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;padding:24px;
+  color:var(--tx-m);text-align:center
+}
+.wf-empty-ico{font-size:28px;opacity:.3}
+.wf-empty-txt{font-size:11px}
+
+/* ═══════════════════ SKILLS EDITOR ═══════════════════ */
+.skill-row{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg);border:1px solid var(--bd-light);
+  border-radius:6px;padding:7px 11px;
+  border-left:2px solid #3fb95050;transition:border-color .2s
+}
+.skill-row:hover{border-color:#3fb95080}
+.skill-icon{font-size:13px;flex-shrink:0}
+.skill-name{flex:1;font-size:12px;font-weight:700;color:var(--cs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.skill-prof-select{
+  background:var(--bg-card2);border:1px solid var(--border);
+  color:var(--tx-s);font-size:11px;border-radius:4px;
+  padding:2px 6px;outline:none;cursor:pointer;flex-shrink:0
+}
+.skill-prof-select:focus{border-color:var(--ca);color:var(--tx-p)}
+.skill-prof-select option{background:var(--bg-card2)}
+.btn-skill-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:12px;padding:2px 5px;
+  border-radius:3px;transition:.15s;flex-shrink:0;line-height:1
+}
+.btn-skill-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.skills-add-wrap{position:relative;margin-top:2px;display:inline-block}
+.btn-add-skill{
+  background:var(--bg-card2);border:1px solid #3fb95060;
+  color:var(--cs);padding:5px 13px;border-radius:6px;cursor:pointer;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  gap:5px;transition:.15s;white-space:nowrap
+}
+.btn-add-skill:hover{border-color:var(--cs);background:#1a332750}
+.skills-dropdown{
+  position:absolute;top:calc(100% + 5px);left:0;z-index:300;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:8px;width:230px;max-height:230px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:mIn .12s ease
+}
+.skills-drop-search{
+  background:var(--bg-card2);border:none;
+  border-bottom:1px solid var(--border);
+  color:var(--tx-p);font-size:11px;padding:7px 10px;
+  outline:none;font-family:inherit;flex-shrink:0
+}
+.skills-drop-list{overflow-y:auto;flex:1}
+.skills-drop-item{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 10px;cursor:pointer;font-size:11px;
+  color:var(--tx-s);border-bottom:1px solid var(--bd-light);transition:.1s
+}
+.skills-drop-item:last-child{border-bottom:none}
+.skills-drop-item:hover{background:var(--bg-card2);color:var(--tx-p)}
+.skills-drop-empty{padding:12px;text-align:center;color:var(--tx-m);font-size:11px}
+
+/* ═══════════════════ RULES EDITOR ═══════════════════ */
+.rule-card{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;transition:border-color .2s;
+  border-left:2px solid #f8514950
+}
+.rule-card:hover{border-color:#f8514970}
+.rule-card-hdr{
+  display:flex;align-items:center;gap:7px;
+  padding:8px 11px;background:var(--bg-card2);
+  cursor:pointer;border-bottom:1px solid var(--bd-light);user-select:none
+}
+.rule-card-arrow{color:var(--tx-m);font-size:11px;transition:transform .2s;flex-shrink:0;font-weight:700}
+.rule-card.collapsed .rule-card-arrow{transform:rotate(-90deg)}
+.rule-card-rule-inp{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--cr);font-size:11px;font-weight:700;cursor:text;min-width:0
+}
+.rule-card-rule-inp:focus{background:var(--bg-card);border-radius:3px;padding:1px 5px;outline:1px solid #f8514950}
+.btn-rule-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:14px;padding:2px 6px;
+  border-radius:4px;transition:.15s;flex-shrink:0;line-height:1
+}
+.btn-rule-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.rule-card-body{padding:9px 11px;display:flex;flex-direction:column;gap:7px}
+.rule-card.collapsed .rule-card-body{display:none}
+.rules-add-wrap{position:relative;margin-top:2px;display:inline-block}
+.btn-add-rule{
+  background:var(--bg-card2);border:1px solid #f8514960;
+  color:var(--cr);padding:5px 13px;border-radius:6px;cursor:pointer;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  gap:5px;transition:.15s;white-space:nowrap
+}
+.btn-add-rule:hover{border-color:var(--cr);background:#3d1f1f50}
+.rules-dropdown{
+  position:absolute;top:calc(100% + 5px);left:0;z-index:300;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:8px;width:270px;max-height:220px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:mIn .12s ease
+}
+.rules-drop-search{
+  background:var(--bg-card2);border:none;
+  border-bottom:1px solid var(--border);
+  color:var(--tx-p);font-size:11px;padding:7px 10px;
+  outline:none;font-family:inherit;flex-shrink:0
+}
+.rules-drop-list{overflow-y:auto;flex:1}
+.rules-drop-item{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 10px;cursor:pointer;font-size:11px;
+  color:var(--tx-s);border-bottom:1px solid var(--bd-light);transition:.1s
+}
+.rules-drop-item:last-child{border-bottom:none}
+.rules-drop-item:hover{background:var(--bg-card2);color:var(--tx-p)}
+.rules-drop-empty{padding:12px;text-align:center;color:var(--tx-m);font-size:11px}
+
+/* ═══════════════════ TOOLS EDITOR ═══════════════════ */
+.tools-sec{display:flex;flex-direction:column;gap:5px;margin-bottom:4px}
+.tools-sec-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 0 5px;border-bottom:1px solid var(--bd-light)
+}
+.tools-sec-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ct);flex:1}
+.tools-sec-cnt{font-size:10px;color:var(--tx-m)}
+.tool-row{
+  display:flex;align-items:flex-start;gap:7px;
+  background:var(--bg);border:1px solid var(--bd-light);
+  border-radius:6px;padding:6px 10px;
+  border-left:2px solid #d2992250;transition:border-color .2s
+}
+.tool-row:hover{border-color:#d2992280}
+.tool-row-inputs{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.tool-row-path{
+  background:none;border:none;outline:none;
+  color:var(--ct);font-size:11px;font-weight:700;
+  width:100%;font-family:inherit
+}
+.tool-row-path:focus{background:var(--bg-card2);border-radius:3px;padding:1px 5px;outline:1px solid #d2992250}
+.tool-row-cmt{
+  background:none;border:none;outline:none;
+  color:var(--tx-m);font-size:10px;
+  width:100%;font-family:inherit;font-style:italic
+}
+.tool-row-cmt:focus{color:var(--tx-s);background:var(--bg-card2);border-radius:3px;padding:1px 5px;outline:1px solid #d2992230}
+.btn-tool-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:12px;padding:2px 5px;
+  border-radius:3px;transition:.15s;flex-shrink:0;line-height:1;margin-top:2px
+}
+.btn-tool-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.tools-add-wrap{position:relative;display:inline-block}
+.btn-add-tool{
+  background:var(--bg-card2);border:1px solid #d2992260;
+  color:var(--ct);padding:4px 11px;border-radius:6px;cursor:pointer;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  gap:5px;transition:.15s;white-space:nowrap
+}
+.btn-add-tool:hover{border-color:var(--ct);background:#3d2e0050}
+.tools-dropdown{
+  position:absolute;top:calc(100% + 5px);left:0;z-index:300;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:8px;width:260px;max-height:210px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:mIn .12s ease
+}
+.tools-drop-search{
+  background:var(--bg-card2);border:none;
+  border-bottom:1px solid var(--border);
+  color:var(--tx-p);font-size:11px;padding:7px 10px;
+  outline:none;font-family:inherit;flex-shrink:0
+}
+.tools-drop-list{overflow-y:auto;flex:1}
+.tools-drop-item{
+  display:flex;align-items:center;gap:7px;
+  padding:7px 10px;cursor:pointer;font-size:11px;
+  color:var(--tx-s);border-bottom:1px solid var(--bd-light);transition:.1s
+}
+.tools-drop-item:last-child{border-bottom:none}
+.tools-drop-item:hover{background:var(--bg-card2);color:var(--tx-p)}
+.tools-drop-empty{padding:12px;text-align:center;color:var(--tx-m);font-size:11px}
+
+/* ═══════════════════ KNOWLEDGE EDITOR ═══════════════════ */
+.kn-list{display:flex;flex-direction:column;gap:8px}
+.kn-card{
+  background:var(--bg);border:1px solid var(--bd-light);
+  border-radius:8px;border-left:3px solid #4a9eff40;
+  overflow:hidden;transition:border-color .2s
+}
+.kn-card:hover{border-color:#4a9eff80}
+.kn-card-hdr{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;background:var(--bg-card2);
+  cursor:pointer;user-select:none
+}
+.kn-card-arrow{color:var(--tx-m);font-size:11px;font-weight:700;transition:transform .2s;flex-shrink:0}
+.kn-card.collapsed .kn-card-arrow{transform:rotate(-90deg)}
+.kn-card.collapsed .kn-card-body{display:none}
+.kn-card-icon{font-size:13px;flex-shrink:0}
+.kn-card-src{
+  flex:1;font-size:11px;font-weight:600;color:#4a9eff;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:'Consolas','Menlo',monospace
+}
+.btn-kn-del{
+  background:none;border:none;color:var(--tx-m);
+  cursor:pointer;font-size:12px;padding:2px 5px;
+  border-radius:3px;transition:.15s;flex-shrink:0
+}
+.btn-kn-del:hover{color:var(--cr);background:rgba(248,81,73,.12)}
+.kn-card-body{
+  padding:8px 12px 10px;
+  display:flex;flex-direction:column;gap:6px;
+  border-top:1px solid var(--bd-light)
+}
+.kn-field-row{display:flex;align-items:flex-start;gap:8px}
+.kn-field-lbl{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--tx-m);
+  width:72px;flex-shrink:0;padding-top:5px
+}
+.kn-add-wrap{position:relative;display:inline-block;margin-top:8px}
+.btn-add-kn{
+  background:var(--bg-card2);border:1px solid #4a9eff60;
+  color:var(--ct);padding:4px 11px;border-radius:6px;cursor:pointer;
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;
+  gap:5px;transition:.15s;white-space:nowrap
+}
+.btn-add-kn:hover{border-color:#4a9eff;background:#0a2a4a50}
+.kn-dropdown{
+  position:absolute;top:calc(100% + 5px);left:0;z-index:300;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:8px;width:300px;max-height:230px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;overflow:hidden;
+  animation:mIn .12s ease
+}
+.kn-drop-search{
+  background:var(--bg-card2);border:none;
+  border-bottom:1px solid var(--border);
+  color:var(--tx-p);font-size:11px;padding:7px 10px;
+  outline:none;font-family:inherit;flex-shrink:0
+}
+.kn-drop-list{overflow-y:auto;flex:1}
+.kn-drop-item{
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 10px;cursor:pointer;
+  border-bottom:1px solid var(--bd-light);transition:.1s
+}
+.kn-drop-item:last-child{border-bottom:none}
+.kn-drop-item:hover{background:var(--bg-card2)}
+.kn-drop-empty{padding:12px;text-align:center;color:var(--tx-m);font-size:11px}
+
+/* ═══════════════════ NEW AGENT CARD ═══════════════════ */
+
+.l1nav-badge:empty,.editor-tag:empty{display:none}
+.ccard-new{
+  background:transparent;
+  border:2px dashed var(--border);border-radius:var(--r);
+  padding:12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:8px;
+  cursor:pointer;min-height:110px;transition:.2s;
+  color:var(--tx-m);user-select:none
+}
+.ccard-new:hover{
+  border-color:var(--ca);color:var(--ca);
+  background:rgba(56,139,253,.05);
+  box-shadow:0 0 10px rgba(56,139,253,.12)
+}
+.ccard-new-icon{font-size:26px;opacity:.45;transition:.2s}
+.ccard-new:hover .ccard-new-icon{opacity:1;transform:scale(1.18)}
+.ccard-new-lbl{font-size:12px;font-weight:700;letter-spacing:.3px}
+.ccard-new-sub{font-size:10px;opacity:.7}
+
+/* ═══════════════════ CREATE AGENT MODAL ═══════════════════ */
+#create-agent-modal .modal-box{width:min(440px,94vw)}
+.create-form-tip{
+  font-size:11px;color:var(--tx-m);line-height:1.75;
+  background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:6px;padding:9px 12px
+}
+.create-form-tip code{color:var(--cc);font-family:monospace;font-size:10px}
+
+/* ═══════════════════ DELETE AGENT ═══════════════════ */
+.ccard-del-btn{
+  cursor:pointer;opacity:0;font-size:10px;padding:2px 6px;
+  background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);
+  border-radius:5px;white-space:nowrap;color:var(--cr);transition:.15s;
+  line-height:1.5
+}
+.ccard:hover .ccard-del-btn{ opacity:0.8 }
+.ccard-del-btn:hover{ opacity:1 !important; background:rgba(248,81,73,.22) !important }
+#delete-agent-modal .modal-box{ width:min(400px,94vw) }
+.del-confirm-name{
+  font-family:monospace;font-size:13px;color:var(--cr);
+  background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);
+  border-radius:5px;padding:4px 10px;display:inline-block;margin:4px 0
+}
+.del-confirm-tip{
+  font-size:11px;color:var(--tx-m);line-height:1.7;
+  background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:6px;padding:8px 11px
+}
+.modal-btn-danger{
+  padding:7px 18px;border-radius:6px;border:none;cursor:pointer;
+  font-size:12px;font-weight:700;transition:.15s;
+  background:var(--cr);color:#fff
+}
+.modal-btn-danger:hover{ filter:brightness(1.15) }
+.modal-btn-danger.saving{ opacity:.55;cursor:not-allowed }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spin">⚙️</div>
+  <div style="color:var(--tx-s);font-size:14px">Driver HAL 路由可视化中心</div>
+  <div id="ld-sub">正在连接服务器...</div>
+</div>
+
+<!-- Header -->
+<header id="hdr">
+  <div class="logo">
+    <span>🚗</span>
+    <span>Embedded Software Develop Agents Team</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="conn off" id="conn">
+    <div class="dot"></div>
+    <span id="conn-txt">连接中…</span>
+  </div>
+  <button class="btn-h" onclick="doRefresh()">🔄 刷新</button>
+</header>
+
+<div id="page">
+
+  <!-- ── DASHBOARD (上方：组件信息) ── -->
+  <section id="dashboard">
+    <div class="tab-bar">
+      <button class="tab active" data-tab="agents"   onclick="switchTab('agents')">
+        🤖 Agents <span class="tab-count" id="cnt-agents">-</span>
+      </button>
+      <button class="tab" data-tab="skills"   onclick="switchTab('skills')">
+        ⚙️ Skills <span class="tab-count" id="cnt-skills">-</span>
+      </button>
+      <button class="tab" data-tab="rules"    onclick="switchTab('rules')">
+        📋 Rules <span class="tab-count" id="cnt-rules">-</span>
+      </button>
+      <button class="tab" data-tab="knowledge" onclick="switchTab('knowledge')">
+        📚 Knowledge <span class="tab-count" id="cnt-knowledge">-</span>
+      </button>
+      <button class="tab" data-tab="tools"   onclick="switchTab('tools')">
+        🔧 Tools <span class="tab-count" id="cnt-tools">-</span>
+      </button>
+    </div>
+    <div id="tab-agents"    class="tab-panel active"><div class="cards" id="cards-agents"></div></div>
+    <div id="tab-skills"    class="tab-panel"><div class="cards" id="cards-skills"></div></div>
+    <div id="tab-rules"     class="tab-panel"><div class="cards" id="cards-rules"></div></div>
+    <div id="tab-knowledge" class="tab-panel"><div class="cards" id="cards-knowledge"></div></div>
+    <div id="tab-tools"     class="tab-panel"><div class="cards" id="cards-tools"></div></div>
+  </section>
+
+  <!-- ── ROUTING (下方：路由关系) ── -->
+  <section id="routing">
+    <div class="route-hdr">
+      <span class="route-hdr-title">路由关系</span>
+      <!-- 指令输入框 -->
+      <div class="route-input-wrap">
+        <input id="route-input" type="text"
+          placeholder="输入开发指令，如：SPI DMA 驱动开发、CAN 总线初始化..."
+          autocomplete="off"
+          onkeydown="if(event.key==='Enter') sendRoute()" />
+        <button class="btn-send" onclick="sendRoute()">▶ 路由</button>
+      </div>
+      <span id="route-kw" style="display:none"></span>
+      <span id="route-time"></span>
+    </div>
+
+    <div id="route-body">
+      <!-- Empty state (default) -->
+      <div id="route-empty">
+        <div class="em-icon">🗺️</div>
+        <div class="em-text">路由关系等待同步</div>
+        <div class="em-hint">
+          在上方输入框键入开发指令后点击 <b style="color:var(--ca)">▶ 路由</b> 即可查看路由关系。<br>
+          Siada 也可通过 API 实时推送：<br>
+          <code>curl -X POST http://localhost:5000/api/push_route \</code><br>
+          <code>&nbsp;&nbsp;-d '{"instruction":"开发SPI驱动"}'</code>
+        </div>
+      </div>
+      <!-- Flow diagram (populated by JS) -->
+      <div id="route-flow" class="flow-wrap" style="display:none"></div>
+    </div>
+
+    <div id="api-hint">
+      💡 Siada 中输入指令后可调用：
+      <code>POST /api/push_route {"instruction":"..."}</code>
+      实时同步到此页面
+    </div>
+  </section>
+
+</div>
+
+<!-- Agent Config Modal -->
+<div id="agent-modal" class="modal-overlay" onclick="if(event.target===this)closeAgentModal()">
+  <div class="modal-box modal-wide">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">🤖</span>
+      <span id="modal-title">Agent 配置</span>
+      <button class="modal-close" onclick="closeAgentModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <input type="hidden" id="modal-agent-id">
+    <div class="modal-mid">
+      <nav id="modal-l1nav" class="modal-l1nav"></nav>
+      <div class="modal-rpane">
+        <div id="modal-bc" class="modal-bc" style="display:none"></div>
+        <div id="modal-l2list" class="modal-l2list" style="display:none"></div>
+        <div id="modal-editor" class="modal-editor">
+          <div class="modal-hint"><div class="hint-ico">⬅</div><div class="hint-txt">从左侧选择配置项</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">💡 保存后立即写入 agents/*.md 并实时同步到所有客户端</span>
+      <button class="modal-btn-cancel" onclick="closeAgentModal()">取消</button>
+      <button class="modal-btn-save" id="modal-save-btn" onclick="saveAgentConfig()">💾 保存到文件</button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Agent Modal -->
+<div id="create-agent-modal" class="modal-overlay" onclick="if(event.target===this)closeCreateAgentModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">✨</span>
+      <span style="font-size:14px;font-weight:700;color:var(--tx-p);flex:1">创建新 Agent</span>
+      <button class="modal-close" onclick="closeCreateAgentModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">
+          Agent 名称
+          <span class="form-hint">（英文，将作为文件名）</span>
+        </label>
+        <input id="create-agent-name" class="form-input" type="text"
+          placeholder="例如：my-custom-agent、can-fd-agent"
+          autocomplete="off"
+          onkeydown="if(event.key==='Enter')doCreateAgent()" />
+      </div>
+      <div class="create-form-tip">
+        💡 将创建 <code>agents/&lt;名称&gt;.md</code> 文件，包含完整的 11 节默认模板结构（workflows / skills / tools / rules / knowledges / human_checks 等），所有配置项为默认占位值，创建后可在 <b style="color:var(--tx-p)">✏️ 配置</b> 面板中逐项修改。<br><br>
+        命名规则：小写字母、数字和短横线，推荐以 <code>-agent</code> 结尾（如 <code>can-fd-agent</code>）。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">创建后可立即点击卡片上的 ✏️ 配置 进行编辑</span>
+      <button class="modal-btn-cancel" onclick="closeCreateAgentModal()">取消</button>
+      <button class="modal-btn-save" id="create-agent-btn" onclick="doCreateAgent()">✨ 创建 Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Agent Modal -->
+<div id="delete-agent-modal" class="modal-overlay" onclick="if(event.target===this)closeDeleteAgentModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">🗑️</span>
+      <span style="font-size:14px;font-weight:700;color:var(--cr);flex:1">删除 Agent</span>
+      <button class="modal-close" onclick="closeDeleteAgentModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:10px;font-size:13px;color:var(--tx-s)">
+        确认要删除 Agent：
+      </div>
+      <div id="del-agent-name" class="del-confirm-name">agent-name</div>
+      <div class="del-confirm-tip" style="margin-top:10px">
+        ⚠️ 此操作将永久删除 <code id="del-agent-path">agents/xxx.md</code> 文件，<b style="color:var(--cr)">无法撤销</b>。<br>
+        删除后该 Agent 将从路由系统中移除，所有关联路由规则将失效。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">删除前请确认该 Agent 已不再被路由规则引用</span>
+      <button class="modal-btn-cancel" onclick="closeDeleteAgentModal()">取消</button>
+      <button class="modal-btn-danger" id="delete-agent-confirm-btn" onclick="doDeleteAgent()">🗑️ 确认删除</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Delete Config Section Confirm Modal -->
+<div id="del-sec-modal" class="modal-overlay" onclick="if(event.target===this)_closeDelSecModal()">
+  <div class="modal-box" style="width:min(380px,94vw)">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">⚠️</span>
+      <span style="font-size:14px;font-weight:700;color:var(--cr);flex:1">删除配置节</span>
+      <button class="modal-close" onclick="_closeDelSecModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--tx-s);margin-bottom:8px">确认删除以下配置节：</div>
+      <div id="del-sec-name" class="del-confirm-name">section-name</div>
+      <div class="del-confirm-tip" style="margin-top:10px">
+        ⚠️ 此操作将从当前 Agent 配置中移除该节内容。<br>
+        <b style="color:var(--ct)">点击"保存到文件"后才会写入磁盘</b>，保存前可取消并撤回。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint"></span>
+      <button class="modal-btn-cancel" onclick="_closeDelSecModal()">取消</button>
+      <button class="modal-btn-danger" id="del-sec-confirm-btn" onclick="_doDelSec()">🗑️ 确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Config Modal -->
+<div id="add-config-modal" class="modal-overlay" onclick="if(event.target===this)_closeAddConfigModal()">
+  <div class="modal-box" style="width:min(480px,94vw)">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">⚙️</span>
+      <span style="font-size:14px;font-weight:700;color:var(--tx-p);flex:1">Add New Config</span>
+      <button class="modal-close" onclick="_closeAddConfigModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <div class="modal-body" id="add-config-body">
+      <div class="form-row">
+        <label class="form-label">Config Name <span class="form-hint">（section 标题，如 my_config）</span></label>
+        <input id="add-config-name" class="form-input" type="text" placeholder="my_config" autocomplete="off" />
+      </div>
+      <div class="form-section-sep"></div>
+      <div class="form-row">
+        <label class="form-label">Custom Fields <span class="form-hint">（可添加任意 key/value 参数）</span></label>
+        <div id="add-config-fields" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+        <button class="btn-add-sm" style="margin-top:6px;align-self:flex-start" onclick="_addConfigField()">＋ Add Field</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">💡 新节将作为 YAML 节添加到 Agent 配置中</span>
+      <button class="modal-btn-cancel" onclick="_closeAddConfigModal()">取消</button>
+      <button class="modal-btn-save" id="add-config-confirm-btn" onclick="_doAddConfig()">✅ 添加配置节</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toasts"></div>
+
+<script>
+'use strict';
+/* ────────── State ────────── */
+let socket = null;
+let projectData = null;
+let currentTab = 'agents';
+let activeAgentIds = new Set();
+let activeSkillIds = new Set();
+let activeRuleIds  = new Set();
+
+/* ────────── Socket ────────── */
+function initSocket() {
+  // 使用 polling 传输（开发服务器不支持 WebSocket 升级）
+  socket = io({ transports: ['polling'], upgrade: false });
+
+  socket.on('connect', () => {
+    setConn(true);
+    setLdSub('已连接，正在加载组件...');
+  });
+
+  socket.on('disconnect', () => {
+    setConn(false);
+    toast('与服务器断开连接', 'd');
+  });
+
+  socket.on('project_update', (msg) => {
+    projectData = msg.data || msg;
+    renderAllCards(projectData);
+    updateCounts(projectData);
+    if (msg.type === 'initial' || msg.type === 'refresh') {
+      hideLd();
+    } else if (msg.type === 'modified') {
+      toast('已修改: ' + msg.changed_file, 'm');
+      highlightCard(msg.changed_file);
+    } else if (msg.type === 'created') {
+      toast('新增: ' + msg.changed_file, 'c');
+    } else if (msg.type === 'deleted') {
+      toast('已删除: ' + msg.changed_file, 'd');
+    }
+  });
+
+  socket.on('routing_result', (result) => {
+    renderRoutingFlow(result);
+  });
+
+  socket.on('connect_error', () => {
+    setLdSub('连接失败，请确认 server.py 已启动');
+  });
+}
+
+/* ────────── Tab ────────── */
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p =>
+    p.classList.toggle('active', p.id === 'tab-'+name));
+}
+
+/* ────────── Cards rendering ────────── */
+const ICONS = {agent:'🤖',skill:'⚙️',tool:'🔧',rules:'📋',knowledge:'📚'};
+
+/* ── Agent 工作状态（实时反映路由活动状态，无需手动切换） ── */
+const _AGENT_ST_CSS = { free:'st-free', waiting:'st-waiting', working:'st-working', done:'st-done' };
+const _AGENT_ST_LBL = { free:'💤 空闲', waiting:'⏳ 等待', working:'⚡ 工作中', done:'✅ 完成' };
+function _getAgentSt(id) { return activeAgentIds.has(id) ? 'working' : 'free'; }
+
+function renderAllCards(data) {
+  renderAgents(data.agents || []);
+  renderSkills(data.skills || []);
+  renderRules(data.rules || []);
+  renderKnowledge(data.knowledge || []);
+  renderTools(data.tools || []);
+}
+
+function renderAgents(agents) {
+  const el = document.getElementById('cards-agents');
+  const agentCards = agents.map(a => {
+    const isActive = activeAgentIds.has(a.id);
+    const st    = _getAgentSt(a.id);
+    const stCss = _AGENT_ST_CSS[st];
+    const stLbl = _AGENT_ST_LBL[st];
+    return `<div class="ccard ${isActive?'active-route':''}" id="card-agent-${a.id}">
+      <div class="ccard-head">
+        <span class="ccard-icon">🤖</span>
+        <span class="ccard-name" title="${escHtml(a.name)}">${escHtml(a.name)}</span>
+      </div>
+      <div class="ccard-actions">
+        <span class="ccard-status ${stCss}">${stLbl}</span>
+        <span class="ccard-edit-hint" title="点击编辑配置" style="cursor:pointer;opacity:0.75;font-size:10px;padding:2px 7px;background:var(--bg-card2);border:1px solid var(--border);border-radius:5px;white-space:nowrap" onclick="event.stopPropagation();openAgentConfig('${a.id}')">✏️ 配置</span>
+        <span class="ccard-del-btn" title="删除此 Agent" onclick="event.stopPropagation();openDeleteAgentModal('${a.id}','${escHtml(a.name)}')">🗑️ 删除</span>
+      </div>
+      <div class="ccard-role">${escHtml(a.role||a.description||'暂无描述')}</div>
+      <div class="ccard-path">${a.path}</div>
+    </div>`;
+  }).join('');
+  const newCard = `<div class="ccard-new" onclick="openCreateAgentModal()" title="点击创建新 Agent">
+    <div class="ccard-new-icon">➕</div>
+    <div class="ccard-new-lbl">New Agent</div>
+    <div class="ccard-new-sub">点击创建新 Agent</div>
+  </div>`;
+  el.innerHTML = agentCards + newCard;
+}
+
+function renderSkills(skills) {
+  const el = document.getElementById('cards-skills');
+  el.innerHTML = skills.map(s => {
+    const isActive = activeSkillIds.has(s.id);
+    const cat = s.category || '';
+    const catClass = cat.includes('comm') ? 'cat-comm' : cat.includes('mcal') ? 'cat-mcal' : 'cat-safe';
+    const catLabel = cat.replace('-driver','').toUpperCase();
+    const desc = s.description ? s.description.replace(/\n/g,' ').substring(0,80) : '';
+    return `<div class="ccard ${isActive?'active-route':''}" id="card-skill-${s.id}">
+      ${catLabel ? `<div class="ccard-cat ${catClass}">${catLabel}</div>` : ''}
+      <div class="ccard-head">
+        <span class="ccard-icon">⚙️</span>
+        <span class="ccard-name">${s.name}</span>
+        <span class="ccard-status st-active">active</span>
+      </div>
+      <div class="ccard-role">${desc||'通信/MCAL 驱动技能'}</div>
+      <div class="ccard-path">${s.path}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRules(rules) {
+  const el = document.getElementById('cards-rules');
+  el.innerHTML = rules.map(r => {
+    const isActive = activeRuleIds.has(r.id);
+    return `<div class="ccard ${isActive?'active-route':''}" id="card-rules-${r.id}">
+      <div class="ccard-head">
+        <span class="ccard-icon">📋</span>
+        <span class="ccard-name">${r.name}</span>
+        <span class="ccard-status st-active">启用</span>
+      </div>
+      <div class="ccard-role">编码规范约束，所有 Agent 强制遵循</div>
+      <div class="chip-row">
+        <span class="chip chip-r">C99</span>
+        <span class="chip chip-r">MISRA-C</span>
+        <span class="chip chip-r">ASIL-D</span>
+      </div>
+      <div class="ccard-path">${r.path}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderKnowledge(knowledge) {
+  const el = document.getElementById('cards-knowledge');
+  const descMap = {
+    'knowledge-datasheets': '芯片寄存器说明、时序参数手册摘要',
+    'knowledge-standards':  'AUTOSAR SWS / ISO 26262 / MISRA-C 规范片段',
+    'knowledge-patterns':   '状态机、观察者、环形缓冲区等驱动设计模式',
+    'knowledge-faq':        'SPI 时序、CAN BusOff、Flash 磨损均衡等 FAQ',
+  };
+  el.innerHTML = knowledge.map(k => {
+    const st = k.status === 'pending' ? 'st-pending' : 'st-active';
+    const stLabel = k.status === 'pending' ? '待创建' : '已建立';
+    return `<div class="ccard" id="card-kn-${k.id}">
+      <div class="ccard-head">
+        <span class="ccard-icon">📚</span>
+        <span class="ccard-name">${k.name}</span>
+        <span class="ccard-status ${st}">${stLabel}</span>
+      </div>
+      <div class="ccard-role">${descMap[k.id]||'技术知识库'}</div>
+      <div class="ccard-path">${k.path}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderTools(tools) {
+  const el = document.getElementById('cards-tools');
+  el.innerHTML = tools.map(t => {
+    const st = t.status === 'virtual' ? 'st-virtual' : 'st-active';
+    const stLabel = t.status === 'virtual' ? '虚拟' : '可用';
+    return `<div class="ccard" id="card-tool-${t.id}">
+      <div class="ccard-head">
+        <span class="ccard-icon">🔧</span>
+        <span class="ccard-name">${t.name}</span>
+        <span class="ccard-status ${st}">${stLabel}</span>
+      </div>
+      <div class="ccard-role">${toolDesc(t.id)}</div>
+      <div class="ccard-path">${t.path}</div>
+    </div>`;
+  }).join('');
+}
+
+function toolDesc(id) {
+  const m = {
+    static_analyzer:'MISRA-C:2012 静态检查',
+    unit_test_runner:'单元测试执行与覆盖率报告',
+    autosar_configurator:'AUTOSAR 配置生成工具',
+    hil_simulator:'HIL 硬件在环仿真环境',
+    oscilloscope_tool:'SPI/I2C 时序波形验证',
+    can_analyzer:'CAN/CANFD 总线分析仪',
+    eth_sniffer:'以太网报文抓包工具',
+    'create-skill':'创建新 Skill 脚本',
+  };
+  return m[id] || '开发辅助工具';
+}
+
+/* ────────── Send Route (from input box) ────────── */
+function sendRoute() {
+  const inp = document.getElementById('route-input');
+  const instruction = (inp.value || '').trim();
+  if (!instruction) { inp.focus(); return; }
+  if (!socket || !socket.connected) {
+    toast('WebSocket 未连接，请检查服务器', 'd'); return;
+  }
+  socket.emit('route_instruction', { instruction });
+  toast('正在路由: ' + instruction, 'c');
+}
+
+/* ────────── Routing Flow ────────── */
+function renderRoutingFlow(result) {
+  const empty = document.getElementById('route-empty');
+  const flow  = document.getElementById('route-flow');
+  const kwEl    = document.getElementById('route-kw');
+  const timeEl  = document.getElementById('route-time');
+
+  // 更新状态栏时间
+  timeEl.textContent = new Date().toLocaleTimeString('zh-CN');
+
+  // 将已路由的指令回显到输入框
+  const inp = document.getElementById('route-input');
+  if (inp && result.instruction) inp.value = result.instruction;
+
+  if (result.status === 'no_match') {
+    kwEl.style.display = 'none';
+    empty.style.display = 'flex';
+    flow.style.display = 'none';
+    empty.innerHTML = `
+      <div class="em-icon">❌</div>
+      <div class="em-text" style="color:var(--cr)">未匹配到 Agent</div>
+      <div class="em-hint">${result.message||''}</div>`;
+    return;
+  }
+
+  // 更新关键词徽章
+  const kws = (result.matched_keywords||[]).join(', ');
+  kwEl.textContent = kws;
+  kwEl.style.display = kws ? 'inline' : 'none';
+
+  // 收集活跃 ID，高亮卡片
+  activeAgentIds = new Set((result.matched_agents||[]).map(a=>a.id));
+  activeSkillIds = new Set((result.activated_skills||[]).map(s=>s.id));
+  activeRuleIds  = new Set((result.route_path||[])
+    .filter(n=>n.type==='rules').map(n=>n.id));
+
+  // 重新渲染卡片以应用高亮
+  if (projectData) renderAllCards(projectData);
+
+  // 构建流程图
+  const agents = result.matched_agents || [];
+  const skills = result.activated_skills || [];
+  const rules  = (result.route_path||[]).filter(n=>n.type==='rules');
+
+  flow.innerHTML = '';
+
+  // Stage 1: Instruction
+  flow.appendChild(buildStage('指令', [
+    `<div class="flow-node fn-instruction">
+      <span>💡</span>
+      <span class="fn-text">${escHtml(result.instruction||'')}</span>
+    </div>`
+  ]));
+
+  flow.appendChild(arrowEl());
+
+  // Stage 2: Agents
+  flow.appendChild(buildStage('Agent', agents.map(a =>
+    `<div class="flow-node fn-agent">🤖 ${escHtml(a.name||a.id)}</div>`
+  )));
+
+  flow.appendChild(arrowEl());
+
+  // Stage 3: Skills
+  flow.appendChild(buildStage('Skills', skills.map(s =>
+    `<div class="flow-node fn-skill">⚙️ ${escHtml(s.name||s.id)}</div>`
+  )));
+
+  flow.appendChild(arrowEl());
+
+  // Stage 4: Rules
+  flow.appendChild(buildStage('Rules', rules.map(r =>
+    `<div class="flow-node fn-rules">📋 ${escHtml(r.name||r.id)}</div>`
+  )));
+
+  empty.style.display = 'none';
+  flow.style.display  = 'flex';
+
+  // Animate: sequential highlight
+  const nodes = flow.querySelectorAll('.flow-node');
+  nodes.forEach((n, i) => {
+    setTimeout(() => {
+      n.classList.add('highlight');
+      setTimeout(() => n.classList.remove('highlight'), 700);
+    }, i * 120);
+  });
+}
+
+function buildStage(label, nodeHtmlArr) {
+  const stage = document.createElement('div');
+  stage.className = 'flow-stage';
+  stage.innerHTML = `<div class="stage-lbl">${label}</div>
+    <div class="flow-nodes">${nodeHtmlArr.join('')}</div>`;
+  return stage;
+}
+
+function arrowEl() {
+  const el = document.createElement('div');
+  el.className = 'flow-arrow';
+  el.innerHTML = `<svg viewBox="0 0 40 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <line x1="0" y1="10" x2="32" y2="10" stroke="#484f58" stroke-width="1.5"/>
+    <polyline points="26,4 34,10 26,16" fill="none" stroke="#484f58" stroke-width="1.5" stroke-linejoin="round"/>
+  </svg>`;
+  return el;
+}
+
+/* ────────── Highlight changed card ────────── */
+function highlightCard(filePath) {
+  let cardId = null;
+  let m;
+  m = filePath.match(/agents\/([^/]+)\.md/);
+  if (m) cardId = 'card-agent-' + m[1];
+  m = filePath.match(/skills\/([^/]+)\//);
+  if (m) cardId = 'card-skill-' + m[1];
+  m = filePath.match(/rules\/([^/]+)\.md/);
+  if (m) cardId = 'card-rules-' + m[1];
+  if (!cardId) return;
+  const el = document.getElementById(cardId);
+  if (!el) return;
+  el.classList.add('active-route');
+  setTimeout(() => el.classList.remove('active-route'), 2000);
+}
+
+/* ────────── Counts ────────── */
+function updateCounts(data) {
+  document.getElementById('cnt-agents').textContent    = (data.agents||[]).length;
+  document.getElementById('cnt-skills').textContent    = (data.skills||[]).length;
+  document.getElementById('cnt-rules').textContent     = (data.rules||[]).length;
+  document.getElementById('cnt-knowledge').textContent = (data.knowledge||[]).length;
+  document.getElementById('cnt-tools').textContent     = (data.tools||[]).length;
+}
+
+/* ────────── Helpers ────────── */
+function doRefresh() {
+  if (socket && socket.connected) socket.emit('refresh_components');
+  toast('正在刷新...', 'c');
+}
+
+function setConn(ok) {
+  const el = document.getElementById('conn');
+  const tx = document.getElementById('conn-txt');
+  el.className = 'conn ' + (ok ? 'on' : 'off');
+  tx.textContent = ok ? '已连接' : '已断开';
+}
+
+function setLdSub(t) {
+  document.getElementById('ld-sub').textContent = t;
+}
+
+function hideLd() {
+  const el = document.getElementById('loading');
+  el.classList.add('out');
+  setTimeout(() => { el.style.display = 'none'; }, 450);
+}
+
+function toast(msg, type='') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<b>${msg}</b>`;
+  c.appendChild(t);
+  setTimeout(() => { try { c.removeChild(t); } catch(e){} }, 3100);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ════════════════════════════════════════════════════
+   Agent Config Modal — 三级下钻导航
+   ════════════════════════════════════════════════════ */
+let _modalAgentData = null;
+let _editFM  = {};   // frontmatter 字段 → 当前值
+let _editSec = {};   // sectionTitle → 当前编辑内容
+let _navL1   = null; // 'fm' | 'sec:N'
+let _navL2   = null; // child index | null
+let _workflowData = []; // 当前编辑的 workflow 数组（parsed）
+let _skillsData   = []; // 当前编辑的 skills 数组（parsed）
+let _rulesData       = []; // 当前编辑的 rules 数组（parsed）
+let _toolsData       = { required: [], optional: [] }; // 当前编辑的 tools 数据（parsed）
+let _knowledgeData   = []; // 当前编辑的 knowledge 数组（parsed）
+let _knSecTitle      = 'knowledges'; // 当前 knowledge 章节标题（knowledge 或 knowledges）
+let _macData         = []; // 当前编辑的 multi-agent-collaboration 数组（parsed）
+let _hcData          = []; // 当前编辑的 human_checks 数组（parsed）
+let _ofData          = []; // 当前编辑的 output_formats 数组（parsed）
+let _pmData          = []; // 当前编辑的 performance_metrics 数组（parsed）
+
+/* ── 打开 Modal ── */
+function openAgentConfig(agentId) {
+  if (!projectData) { toast('数据未加载', 'd'); return; }
+  const agent = (projectData.agents || []).find(a => a.id === agentId);
+  if (!agent) { toast('找不到 Agent: ' + agentId, 'd'); return; }
+  _modalAgentData = agent;
+  _navL1 = null; _navL2 = null;
+  _workflowData = [];
+  _skillsData   = [];
+  _rulesData    = [];
+  _toolsData    = { required: [], optional: [] };
+  _knowledgeData = [];
+  _knSecTitle    = 'knowledges';
+  _macData       = [];
+  _hcData        = [];
+  _ofData        = [];
+  _pmData        = [];
+
+  document.getElementById('modal-agent-id').value = agentId;
+  document.getElementById('modal-title').textContent = '⚙️ ' + agent.name;
+
+  /* 初始化编辑缓存 */
+  const ctx = agent.automotive_context || {};
+  _editFM = {
+    role:            agent.role || '',
+    description:     agent.description || '',
+    expertise:       (agent.expertise || []).join('\n'),
+    responsibilities:(agent.responsibilities || []).join('\n'),
+    oem_tier:        ctx.oem_tier || '',
+    lifecycle_phase: ctx.lifecycle_phase || '',
+    standards:       (agent.standards || []).join('\n'),
+  };
+  _editSec = {};
+  (agent.sections || []).forEach(s => {
+    _editSec[s.title] = s.content || '';
+    (s.children || []).forEach(c => { _editSec[c.title] = c.content || ''; });
+  });
+
+  _buildL1Nav(agent);
+  _showHint();
+  document.getElementById('agent-modal').classList.add('open');
+}
+
+/* ── 构建 L1 导航栏 ── */
+function _buildL1Nav(agent) {
+  const nav = document.getElementById('modal-l1nav');
+  nav.innerHTML = '';
+  _addL1(nav, 'fm', '📋', '基本信息', false, '', '');
+  const sep = document.createElement('div'); sep.className = 'l1nav-sep'; nav.appendChild(sep);
+  const lbl = document.createElement('div'); lbl.className = 'l1nav-grp-lbl'; lbl.textContent = 'Config List'; nav.appendChild(lbl);
+  (agent.sections || []).forEach((sec, i) => {
+    const hasKids = !!(sec.children && sec.children.length);
+    const icon  = sec.content_type === 'yaml' ? '⚙️' : sec.title === 'system_prompt' ? '💬' : '📝';
+    const badge = '';
+    const bcls  = sec.content_type === 'yaml' ? 'csec-tag-yaml' : '';
+    _addL1(nav, `sec:${i}`, icon, sec.title, hasKids, bcls, badge);
+    // Delete button for each section
+    const _navItem = nav.lastElementChild;
+    const _delBtn = document.createElement('span');
+    _delBtn.className = 'l1nav-del-btn';
+    _delBtn.title = '删除此配置节';
+    _delBtn.textContent = '✕';
+    (function(_idx){ _delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteConfigSection(_idx); }); })(i);
+    _navItem.appendChild(_delBtn);
+  });
+  // Add New config button
+  const sep2 = document.createElement('div'); sep2.className = 'l1nav-sep'; nav.appendChild(sep2);
+  const addBtn = document.createElement('div');
+  addBtn.className = 'l1nav-add-new';
+  addBtn.innerHTML = '<span style="font-size:13px">＋</span><span>Add New</span>';
+  addBtn.title = '新增自定义配置节';
+  addBtn.addEventListener('click', () => _openAddConfigModal());
+  nav.appendChild(addBtn);
+}
+
+function _addL1(nav, key, icon, label, hasKids, badgeCls, badgeText) {
+  const el = document.createElement('div');
+  el.className = 'l1nav-item' + (hasKids ? ' has-children' : '');
+  el.dataset.key = key;
+  el.innerHTML =
+    `<span class="l1nav-icon">${icon}</span>` +
+    `<span class="l1nav-lbl" title="${escHtml(label)}">${escHtml(label)}</span>` +
+    (badgeText ? `<span class="l1nav-badge ${badgeCls}">${badgeText}</span>` : '') +
+    (hasKids   ? `<span class="l1nav-arr">›</span>` : '');
+  el.addEventListener('click', () => _selectL1(key));
+  nav.appendChild(el);
+}
+
+/* ── L1 选中 ── */
+function _selectL1(key) {
+  _navL1 = key; _navL2 = null;
+  document.querySelectorAll('.l1nav-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.key === key));
+  _hideBc();
+
+  if (key === 'fm') {
+    _showPane('editor');
+    _renderFMEditor();
+  } else {
+    const idx = parseInt(key.split(':')[1]);
+    const sec = (_modalAgentData.sections || [])[idx];
+    if (!sec) return;
+    if (_isWorkflowSec(sec)) {
+      _showPane('editor');
+      _renderWorkflowEditor(sec);
+    } else if (_isSkillsSec(sec)) {
+      _showPane('editor');
+      _renderSkillsEditor(sec);
+    } else if (_isRulesSec(sec)) {
+      _showPane('editor');
+      _renderRulesEditor(sec);
+    } else if (_isToolsSec(sec)) {
+      _showPane('editor');
+      _renderToolsEditor(sec);
+    } else if (_isKnowledgeSec(sec)) {
+      _showPane('editor');
+      _renderKnowledgeEditor(sec);
+    } else if (_isMacSec(sec)) {
+      _showPane('editor');
+      _renderMacEditor(sec);
+    } else if (_isHcSec(sec)) {
+      _showPane('editor');
+      _renderHcEditor(sec);
+    } else if (_isOfSec(sec)) {
+      _showPane('editor');
+      _renderOfEditor(sec);
+    } else if (_isPmSec(sec)) {
+      _showPane('editor');
+      _renderPmEditor(sec);
+    } else if (sec.children && sec.children.length > 0) {
+      _showPane('l2list');
+      _renderL2List(sec, idx);
+    } else {
+      _showPane('editor');
+      _renderSecEditor(sec);
+    }
+  }
+}
+
+/* ── L2 选中 → L3 编辑器 ── */
+function _selectL2(secIdx, childIdx) {
+  _navL2 = childIdx;
+  const sec   = (_modalAgentData.sections || [])[secIdx];
+  const child = sec && sec.children[childIdx];
+  if (!child) return;
+  _showBc(sec.title, secIdx, child.title);
+  _showPane('editor');
+  _renderChildEditor(child);
+}
+
+/* ── 面板切换 ── */
+function _showPane(which) {
+  const l2  = document.getElementById('modal-l2list');
+  const ed  = document.getElementById('modal-editor');
+  l2.style.display = which === 'l2list' ? 'block' : 'none';
+  ed.style.display = which === 'editor' ? 'flex'  : 'none';
+}
+
+function _showHint() {
+  _hideBc();
+  _showPane('editor');
+  document.getElementById('modal-editor').innerHTML =
+    '<div class="modal-hint"><div class="hint-ico">⬅</div><div class="hint-txt">从左侧选择配置项</div></div>';
+}
+
+/* ── 面包屑 ── */
+function _showBc(parentTitle, parentSecIdx, childTitle) {
+  const bc = document.getElementById('modal-bc');
+  bc.style.display = 'flex';
+  bc.innerHTML =
+    `<button class="bc-btn" onclick="_selectL1('sec:${parentSecIdx}')">◀ 返回</button>` +
+    `<span class="bc-sep">›</span>` +
+    `<span style="color:var(--tx-s)">${escHtml(parentTitle)}</span>` +
+    `<span class="bc-sep">›</span>` +
+    `<span class="bc-cur">${escHtml(childTitle)}</span>`;
+}
+function _hideBc() { document.getElementById('modal-bc').style.display = 'none'; }
+
+/* ── 渲染 Frontmatter 编辑器 ── */
+function _renderFMEditor() {
+  const el = document.getElementById('modal-editor');
+  el.innerHTML = `
+    <div class="editor-hdr">
+      <span class="editor-level">FM</span>
+      <span class="editor-ttl">基本信息</span>
+      <span class="editor-tag csec-tag-fm">Frontmatter</span>
+    </div>
+    <div class="form-row">
+      <label class="form-label">名称 <span class="form-hint">（只读）</span></label>
+      <input class="form-input" value="${escHtml(_modalAgentData.name||'')}" readonly>
+    </div>
+    <div class="form-row">
+      <label class="form-label">角色 Role</label>
+      <input class="form-input" id="fm-role" value="${escHtml(_editFM.role||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">描述 Description</label>
+      <textarea class="form-textarea" id="fm-description" rows="2">${escHtml(_editFM.description||'')}</textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-label">专业领域 Expertise <span class="form-hint">每行一项</span></label>
+      <textarea class="form-textarea" id="fm-expertise" rows="3">${escHtml(_editFM.expertise||'')}</textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-label">职责 Responsibilities <span class="form-hint">每行一项</span></label>
+      <textarea class="form-textarea" id="fm-responsibilities" rows="3">${escHtml(_editFM.responsibilities||'')}</textarea>
+    </div>
+    <div class="form-section-sep"></div>
+    <div class="form-row">
+      <label class="form-label">OEM Tier <span class="form-hint">automotive_context</span></label>
+      <input class="form-input" id="fm-oem-tier" value="${escHtml(_editFM.oem_tier||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Lifecycle Phase</label>
+      <input class="form-input" id="fm-lifecycle" value="${escHtml(_editFM.lifecycle_phase||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Standards <span class="form-hint">每行一项</span></label>
+      <textarea class="form-textarea" id="fm-standards" rows="2">${escHtml(_editFM.standards||'')}</textarea>
+    </div>`;
+  _bindFM();
+  setTimeout(() => { const e = document.getElementById('fm-role'); if (e) e.focus(); }, 80);
+}
+
+function _bindFM() {
+  [['fm-role','role'],['fm-description','description'],['fm-expertise','expertise'],
+   ['fm-responsibilities','responsibilities'],['fm-oem-tier','oem_tier'],
+   ['fm-lifecycle','lifecycle_phase'],['fm-standards','standards']
+  ].forEach(([id, f]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { _editFM[f] = e.value; });
+  });
+}
+
+/* ── 渲染 L2 列表 ── */
+function _renderL2List(sec, secIdx) {
+  const list = document.getElementById('modal-l2list');
+  let html = `<div class="l2list-hdr">${escHtml(sec.title)}</div>`;
+  if (sec.content) {
+    html += `<div class="l2-intro-wrap">
+      <label class="form-label" style="margin-bottom:4px">章节简介 <span class="form-hint">可编辑</span></label>
+      <textarea class="form-textarea" rows="2" id="l2-intro">${escHtml(_editSec[sec.title]||sec.content)}</textarea>
+    </div>`;
+  }
+  sec.children.forEach((child, ci) => {
+    html += `<div class="l2nav-item" data-si="${secIdx}" data-ci="${ci}">
+      <span class="l2nav-lbl">${escHtml(child.title)}</span>
+      <span class="l2nav-tag csec-tag-md">Markdown</span>
+      <span class="l2nav-arr">›</span>
+    </div>`;
+  });
+  list.innerHTML = html;
+  if (sec.content) {
+    const ta = document.getElementById('l2-intro');
+    if (ta) ta.addEventListener('input', () => { _editSec[sec.title] = ta.value; });
+  }
+  list.querySelectorAll('.l2nav-item').forEach(el => {
+    el.addEventListener('click', () => _selectL2(+el.dataset.si, +el.dataset.ci));
+  });
+}
+
+/* ── 渲染 ## 叶节点编辑器 ── */
+function _renderSecEditor(sec) {
+  const el = document.getElementById('modal-editor');
+  const content = _editSec[sec.title] !== undefined ? _editSec[sec.title] : (sec.content || '');
+  const tagCls  = sec.content_type === 'yaml' ? 'csec-tag-yaml' : 'csec-tag-md';
+  const tagLbl  = sec.content_type === 'yaml' ? '' : 'Markdown';
+  el.innerHTML = `
+    <div class="editor-hdr">
+      <span class="editor-level">##</span>
+      <span class="editor-ttl">${escHtml(sec.title)}</span>
+      <span class="editor-tag ${tagCls}">${tagLbl}</span>
+    </div>
+    <textarea class="form-textarea" id="sec-ta" rows="${sec.content_type==='yaml'?14:10}">${escHtml(content)}</textarea>`;
+  const ta = document.getElementById('sec-ta');
+  ta.addEventListener('input', () => { _editSec[sec.title] = ta.value; });
+  setTimeout(() => ta.focus(), 80);
+}
+
+/* ── 渲染 ### 子节点编辑器 ── */
+function _renderChildEditor(child) {
+  const el = document.getElementById('modal-editor');
+  const content = _editSec[child.title] !== undefined ? _editSec[child.title] : (child.content || '');
+  el.innerHTML = `
+    <div class="editor-hdr">
+      <span class="editor-level">###</span>
+      <span class="editor-ttl">${escHtml(child.title)}</span>
+      <span class="editor-tag csec-tag-md">Markdown</span>
+    </div>
+    <textarea class="form-textarea" id="child-ta" rows="14">${escHtml(content)}</textarea>`;
+  const ta = document.getElementById('child-ta');
+  ta.addEventListener('input', () => { _editSec[child.title] = ta.value; });
+  setTimeout(() => ta.focus(), 80);
+}
+
+/* ── 关闭 ── */
+function closeAgentModal() {
+  document.getElementById('agent-modal').classList.remove('open');
+  _modalAgentData = null; _editFM = {}; _editSec = {};
+  _navL1 = null; _navL2 = null;
+}
+
+/* ── 保存 ── */
+async function saveAgentConfig() {
+  const agentId = document.getElementById('modal-agent-id').value;
+  if (!agentId) return;
+
+  const btn = document.getElementById('modal-save-btn');
+  btn.classList.add('saving');
+  btn.innerHTML = '⏳ 保存中...';
+
+  const fm_fields = {
+    role:            _editFM.role || '',
+    description:     _editFM.description || '',
+    expertise:       (_editFM.expertise||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    responsibilities:(_editFM.responsibilities||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    oem_tier:        _editFM.oem_tier || '',
+    lifecycle_phase: _editFM.lifecycle_phase || '',
+    standards:       (_editFM.standards||'').split('\n').map(s=>s.trim()).filter(Boolean),
+  };
+
+  const sections_order = (_modalAgentData && _modalAgentData.sections || []).map(s => s.title);
+  const payload = { agent_id: agentId, fm_fields, sections_content: { ..._editSec }, sections_order };
+
+  try {
+    const resp = await fetch('/api/save_agent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.status === 'ok') {
+      toast('Agent 配置已保存并同步: ' + agentId, 'c');
+      closeAgentModal();
+    } else {
+      toast('保存失败: ' + (data.error || '未知错误'), 'd');
+    }
+  } catch (e) {
+    toast('网络错误: ' + e.message, 'd');
+  } finally {
+    btn.classList.remove('saving');
+    btn.innerHTML = '💾 保存到文件';
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   Workflow Editor — 可视化三级层级配置
+   层级：Workflow → Step → Action
+   ════════════════════════════════════════════════════ */
+
+/* ── 检测是否为 workflows 章节 ── */
+function _isWorkflowSec(sec) {
+  return !!(sec && sec.title === 'workflows' && window.jsyaml);
+}
+
+/* ── YAML 解析：字符串 → JS 数组 ── */
+function _parseWfYaml(str) {
+  try {
+    const obj = jsyaml.load(str || '');
+    if (obj && Array.isArray(obj.workflows))
+      return JSON.parse(JSON.stringify(obj.workflows));
+    if (Array.isArray(obj))
+      return JSON.parse(JSON.stringify(obj));
+  } catch(e) { console.warn('[WF] yaml parse error', e); }
+  return [];
+}
+
+/* ── YAML 序列化：JS 数组 → 字符串 ── */
+function _dumpWfYaml(arr) {
+  try {
+    return jsyaml.dump({ workflows: arr }, {
+      indent: 2, lineWidth: -1, noRefs: true, skipInvalid: true
+    }).trimEnd();
+  } catch(e) { return ''; }
+}
+
+/* ── 从 DOM 收集最新值同步回 _workflowData 与 _editSec ── */
+function _syncWf() {
+  _workflowData.forEach((wf, wi) => {
+    const n = document.getElementById('wf-name-' + wi);
+    if (n) wf.name = n.value;
+    const t = document.getElementById('wf-trigger-' + wi);
+    if (t) wf.trigger = t.value;
+    (wf.steps || []).forEach((st, si) => {
+      const sn = document.getElementById('wf-sname-' + wi + '-' + si);
+      if (sn) st.step = sn.value;
+      (st.actions || []).forEach((_, ai) => {
+        const a = document.getElementById('wf-act-' + wi + '-' + si + '-' + ai);
+        if (a) st.actions[ai] = a.value;
+      });
+    });
+  });
+  _editSec['workflows'] = _dumpWfYaml(_workflowData);
+}
+
+/* ── 入口：渲染 Workflow 编辑器 ── */
+function _renderWorkflowEditor(sec) {
+  const raw = _editSec[sec.title] !== undefined
+    ? _editSec[sec.title] : (sec.content || '');
+  _workflowData = _parseWfYaml(raw);
+  _rebuildWfEditor();
+}
+
+/* ── 重建整个编辑器 DOM ── */
+function _rebuildWfEditor() {
+  const el = document.getElementById('modal-editor');
+  el.innerHTML = '';
+
+  /* 头栏：标题 + Add New Workflow 按钮 */
+  const toolbar = document.createElement('div');
+  toolbar.className = 'editor-hdr';
+  toolbar.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">workflows</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>' +
+    '<div style="flex:1"></div>' +
+    '<button class="btn-add-wf" id="btn-add-wf">＋ Add New Workflow</button>';
+  el.appendChild(toolbar);
+  document.getElementById('btn-add-wf').addEventListener('click', _addNewWorkflow);
+
+  if (_workflowData.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'wf-empty';
+    empty.innerHTML =
+      '<div class="wf-empty-ico">📋</div>' +
+      '<div class="wf-empty-txt">暂无 Workflow，点击右上角「Add New Workflow」按钮添加</div>';
+    el.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+  _workflowData.forEach((wf, wi) => list.appendChild(_buildWfCard(wf, wi)));
+  el.appendChild(list);
+}
+
+/* ── Level 1：构建 Workflow 卡片 ── */
+function _buildWfCard(wf, wi) {
+  const card = document.createElement('div');
+  card.className = 'wf-card';
+  card.id = 'wf-card-' + wi;
+
+  /* 卡片头部：折叠箭头 + 名称输入 + 标签 + 删除按钮 */
+  const hdr = document.createElement('div');
+  hdr.className = 'wf-card-hdr';
+
+  const arrow = document.createElement('span');
+  arrow.className = 'wf-card-arrow';
+  arrow.textContent = '▾';
+
+  const nameInput = document.createElement('input');
+  nameInput.className = 'wf-card-name';
+  nameInput.id = 'wf-name-' + wi;
+  nameInput.value = wf.name || '';
+  nameInput.placeholder = 'Workflow 名称...';
+  nameInput.addEventListener('click', e => e.stopPropagation());
+  nameInput.addEventListener('input', () => {
+    _workflowData[wi].name = nameInput.value;
+    _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  });
+
+  const badge = document.createElement('span');
+  badge.className = 'l1nav-badge csec-tag-yaml';
+  badge.style.cssText = 'font-size:9px;flex-shrink:0';
+  badge.textContent = 'workflow';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-wf-del';
+  delBtn.title = '删除此 Workflow';
+  delBtn.textContent = '🗑';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteWorkflow(wi); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(nameInput);
+  hdr.appendChild(badge);
+  hdr.appendChild(delBtn);
+  hdr.addEventListener('click', () => _toggleWfCard(wi));
+  card.appendChild(hdr);
+
+  /* 卡片体部 */
+  const body = document.createElement('div');
+  body.className = 'wf-card-body';
+  body.id = 'wf-body-' + wi;
+
+  /* trigger 字段 */
+  const trigRow = document.createElement('div');
+  trigRow.className = 'wf-field-row';
+  const trigLbl = document.createElement('div');
+  trigLbl.className = 'wf-field-lbl';
+  trigLbl.innerHTML = '⚡ Trigger';
+  const trigInput = document.createElement('input');
+  trigInput.className = 'wf-input';
+  trigInput.id = 'wf-trigger-' + wi;
+  trigInput.value = wf.trigger || '';
+  trigInput.placeholder = '触发条件描述...';
+  trigInput.addEventListener('input', () => {
+    _workflowData[wi].trigger = trigInput.value;
+    _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  });
+  trigRow.appendChild(trigLbl);
+  trigRow.appendChild(trigInput);
+  body.appendChild(trigRow);
+
+  /* steps 区域 */
+  const stepsSection = document.createElement('div');
+  stepsSection.className = 'wf-steps-section';
+  const stepsLbl = document.createElement('div');
+  stepsLbl.className = 'wf-steps-lbl';
+  stepsLbl.innerHTML = '📋 Steps';
+  stepsSection.appendChild(stepsLbl);
+
+  const stepsWrap = document.createElement('div');
+  stepsWrap.id = 'wf-steps-' + wi;
+  stepsWrap.style.cssText = 'display:flex;flex-direction:column;gap:5px';
+  (wf.steps || []).forEach((step, si) => {
+    stepsWrap.appendChild(_buildStepItem(step, wi, si));
+  });
+  stepsSection.appendChild(stepsWrap);
+
+  /* Add Step 按钮 */
+  const addStepWrap = document.createElement('div');
+  addStepWrap.style.cssText = 'margin-left:12px;margin-top:2px';
+  const addStepBtn = document.createElement('button');
+  addStepBtn.className = 'btn-add-sm';
+  addStepBtn.innerHTML = '＋ Add Step';
+  addStepBtn.addEventListener('click', () => _addStep(wi));
+  addStepWrap.appendChild(addStepBtn);
+  stepsSection.appendChild(addStepWrap);
+
+  body.appendChild(stepsSection);
+  card.appendChild(body);
+  return card;
+}
+
+/* ── Level 2：构建 Step 项 ── */
+function _buildStepItem(step, wi, si) {
+  const item = document.createElement('div');
+  item.className = 'wf-step-item';
+  item.id = 'wf-step-' + wi + '-' + si;
+
+  /* Step 头部：折叠箭头 + 名称输入 + 删除按钮 */
+  const hdr = document.createElement('div');
+  hdr.className = 'wf-step-hdr';
+
+  const arrow = document.createElement('span');
+  arrow.className = 'wf-step-arrow';
+  arrow.textContent = '▾';
+
+  const nameInput = document.createElement('input');
+  nameInput.className = 'wf-step-name';
+  nameInput.id = 'wf-sname-' + wi + '-' + si;
+  nameInput.value = step.step || '';
+  nameInput.placeholder = 'Step 名称...';
+  nameInput.addEventListener('click', e => e.stopPropagation());
+  nameInput.addEventListener('input', () => {
+    if (_workflowData[wi]?.steps?.[si]) {
+      _workflowData[wi].steps[si].step = nameInput.value;
+      _editSec['workflows'] = _dumpWfYaml(_workflowData);
+    }
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-step-del';
+  delBtn.title = '删除此 Step';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteStep(wi, si); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(nameInput);
+  hdr.appendChild(delBtn);
+  hdr.addEventListener('click', () => _toggleStep(wi, si));
+  item.appendChild(hdr);
+
+  /* Step 体部 */
+  const body = document.createElement('div');
+  body.className = 'wf-step-body';
+  body.id = 'wf-step-body-' + wi + '-' + si;
+
+  const actLbl = document.createElement('div');
+  actLbl.className = 'wf-field-lbl';
+  actLbl.style.cssText = 'margin-bottom:2px;margin-left:8px';
+  actLbl.innerHTML = '▸ Actions';
+  body.appendChild(actLbl);
+
+  /* actions 列表 */
+  const actList = document.createElement('div');
+  actList.className = 'wf-actions-list';
+  actList.id = 'wf-acts-' + wi + '-' + si;
+  (step.actions || []).forEach((action, ai) => {
+    actList.appendChild(_buildActionRow(action, wi, si, ai));
+  });
+  body.appendChild(actList);
+
+  /* Add Action 按钮 */
+  const addActWrap = document.createElement('div');
+  addActWrap.style.cssText = 'margin-left:8px;margin-top:3px';
+  const addActBtn = document.createElement('button');
+  addActBtn.className = 'btn-add-sm';
+  addActBtn.innerHTML = '＋ Add Action';
+  addActBtn.addEventListener('click', () => _addAction(wi, si));
+  addActWrap.appendChild(addActBtn);
+  body.appendChild(addActWrap);
+
+  item.appendChild(body);
+  return item;
+}
+
+/* ── Level 3：构建 Action 行 ── */
+function _buildActionRow(action, wi, si, ai) {
+  const row = document.createElement('div');
+  row.className = 'wf-action-row';
+  row.id = 'wf-act-row-' + wi + '-' + si + '-' + ai;
+
+  const bullet = document.createElement('span');
+  bullet.className = 'wf-action-bullet';
+  bullet.textContent = '•';
+
+  const ta = document.createElement('textarea');
+  ta.className = 'wf-action-ta';
+  ta.id = 'wf-act-' + wi + '-' + si + '-' + ai;
+  ta.rows = 1;
+  ta.placeholder = 'Action 描述...';
+  ta.value = action || '';
+  const resize = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  setTimeout(resize, 0);
+  ta.addEventListener('input', () => {
+    resize();
+    if (_workflowData[wi]?.steps?.[si]) {
+      _workflowData[wi].steps[si].actions[ai] = ta.value;
+      _editSec['workflows'] = _dumpWfYaml(_workflowData);
+    }
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-action-del';
+  delBtn.title = '删除此 Action';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', () => _deleteAction(wi, si, ai));
+
+  row.appendChild(bullet);
+  row.appendChild(ta);
+  row.appendChild(delBtn);
+  return row;
+}
+
+/* ── 折叠 / 展开 ── */
+function _toggleWfCard(wi) {
+  const card = document.getElementById('wf-card-' + wi);
+  if (card) card.classList.toggle('collapsed');
+}
+function _toggleStep(wi, si) {
+  const item = document.getElementById('wf-step-' + wi + '-' + si);
+  if (item) item.classList.toggle('collapsed');
+}
+
+/* ── 增删：Workflow ── */
+function _addNewWorkflow() {
+  _syncWf();
+  _workflowData.push({
+    name: 'New Workflow',
+    trigger: '触发条件描述',
+    steps: [{ step: 'Step 1', actions: ['Action description'] }]
+  });
+  _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  _rebuildWfEditor();
+  setTimeout(() => {
+    const newWi = _workflowData.length - 1;
+    const card = document.getElementById('wf-card-' + newWi);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const ni = document.getElementById('wf-name-' + newWi);
+      if (ni) { ni.focus(); ni.select(); }
+    }
+  }, 60);
+}
+
+function _deleteWorkflow(wi) {
+  _syncWf();
+  const name = _workflowData[wi]?.name || 'Workflow';
+  if (!confirm('确定删除「' + name + '」？')) return;
+  _workflowData.splice(wi, 1);
+  _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  _rebuildWfEditor();
+}
+
+/* ── 增删：Step ── */
+function _addStep(wi) {
+  _syncWf();
+  if (!_workflowData[wi]) return;
+  if (!_workflowData[wi].steps) _workflowData[wi].steps = [];
+  _workflowData[wi].steps.push({ step: 'New Step', actions: ['New action'] });
+  _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  _rebuildWfEditor();
+  const si = _workflowData[wi].steps.length - 1;
+  setTimeout(() => {
+    const el = document.getElementById('wf-sname-' + wi + '-' + si);
+    if (el) { el.focus(); el.select(); }
+  }, 60);
+}
+
+function _deleteStep(wi, si) {
+  _syncWf();
+  const name = _workflowData[wi]?.steps?.[si]?.step || 'Step';
+  if (!confirm('确定删除 Step「' + name + '」？')) return;
+  _workflowData[wi].steps.splice(si, 1);
+  _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  _rebuildWfEditor();
+}
+
+/* ── 增删：Action ── */
+function _addAction(wi, si) {
+  _syncWf();
+  if (!_workflowData[wi]?.steps?.[si]) return;
+  if (!_workflowData[wi].steps[si].actions) _workflowData[wi].steps[si].actions = [];
+  _workflowData[wi].steps[si].actions.push('');
+  _editSec['workflows'] = _dumpWfYaml(_workflowData);
+  _rebuildWfEditor();
+  const ai = _workflowData[wi].steps[si].actions.length - 1;
+  setTimeout(() => {
+    const el = document.getElementById('wf-act-' + wi + '-' + si + '-' + ai);
+    if (el) el.focus();
+  }, 60);
+}
+
+function _deleteAction(wi, si, ai) {
+  _syncWf();
+  if (_workflowData[wi]?.steps?.[si]?.actions) {
+    _workflowData[wi].steps[si].actions.splice(ai, 1);
+    _editSec['workflows'] = _dumpWfYaml(_workflowData);
+    _rebuildWfEditor();
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   Skills Editor — 可视化技能关联配置
+   功能：列表展示 + 下拉选择所有可用 Skill + Proficiency 选择器
+   ════════════════════════════════════════════════════ */
+
+function _isSkillsSec(sec) {
+  return !!(sec && sec.title === 'skills' && window.jsyaml);
+}
+
+function _parseSkillsYaml(str) {
+  try {
+    const obj = jsyaml.load(str || '');
+    if (obj && Array.isArray(obj.skills))
+      return JSON.parse(JSON.stringify(obj.skills));
+  } catch(e) {}
+  return [];
+}
+
+function _dumpSkillsYaml(arr) {
+  try {
+    return jsyaml.dump({ skills: arr }, {
+      indent: 2, lineWidth: -1, noRefs: true, skipInvalid: true
+    }).trimEnd();
+  } catch(e) { return ''; }
+}
+
+/* ── 入口：渲染 Skills 编辑器 ── */
+function _renderSkillsEditor(sec) {
+  const raw = _editSec[sec.title] !== undefined
+    ? _editSec[sec.title] : (sec.content || '');
+  _skillsData = _parseSkillsYaml(raw);
+  _rebuildSkillsEditor();
+}
+
+/* ── 重建整个 Skills 编辑器 DOM ── */
+function _rebuildSkillsEditor() {
+  const el = document.getElementById('modal-editor');
+  el.innerHTML = '';
+
+  /* 头栏 */
+  const toolbar = document.createElement('div');
+  toolbar.className = 'editor-hdr';
+  toolbar.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">skills</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>' +
+    `<span style="margin-left:auto;font-size:10px;color:var(--tx-m)">${_skillsData.length} 个已关联</span>`;
+  el.appendChild(toolbar);
+
+  /* 技能列表 */
+  const list = document.createElement('div');
+  list.id = 'skills-list';
+  list.style.cssText = 'display:flex;flex-direction:column;gap:5px;';
+
+  if (_skillsData.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'wf-empty';
+    empty.innerHTML =
+      '<div class="wf-empty-ico">⚙️</div>' +
+      '<div class="wf-empty-txt">暂无关联 Skill，点击「Add Skill」从列表选择</div>';
+    list.appendChild(empty);
+  } else {
+    _skillsData.forEach((sk, idx) => list.appendChild(_buildSkillRow(sk, idx)));
+  }
+  el.appendChild(list);
+
+  /* Add Skill 按钮 + 下拉 */
+  const addWrap = document.createElement('div');
+  addWrap.className = 'skills-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-skill';
+  addBtn.id = 'btn-add-skill';
+  addBtn.innerHTML = '＋ Add Skill ▾';
+  addBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    _toggleSkillsDrop(addWrap);
+  });
+  addWrap.appendChild(addBtn);
+  el.appendChild(addWrap);
+}
+
+/* ── 构建单条 Skill 行 ── */
+function _buildSkillRow(sk, idx) {
+  const row = document.createElement('div');
+  row.className = 'skill-row';
+  row.id = 'skill-row-' + idx;
+
+  const icon = document.createElement('span');
+  icon.className = 'skill-icon';
+  icon.textContent = '⚙️';
+
+  const name = document.createElement('span');
+  name.className = 'skill-name';
+  name.title = sk.skill || '';
+  name.textContent = sk.skill || '';
+
+  /* Proficiency 下拉 */
+  const profSel = document.createElement('select');
+  profSel.className = 'skill-prof-select';
+  ['expert', 'advanced', 'intermediate', 'beginner'].forEach(opt => {
+    const o = document.createElement('option');
+    o.value = opt; o.textContent = opt;
+    if ((sk.proficiency || 'advanced') === opt) o.selected = true;
+    profSel.appendChild(o);
+  });
+  /* 专家级用金色标注 */
+  const applyProfColor = () => {
+    profSel.style.color = profSel.value === 'expert' ? 'var(--ct)' :
+                          profSel.value === 'advanced' ? 'var(--cs)' : 'var(--tx-s)';
+  };
+  applyProfColor();
+  profSel.addEventListener('change', () => {
+    _skillsData[idx].proficiency = profSel.value;
+    _editSec['skills'] = _dumpSkillsYaml(_skillsData);
+    applyProfColor();
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-skill-del';
+  delBtn.title = '移除此 Skill';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', () => _deleteSkill(idx));
+
+  row.appendChild(icon);
+  row.appendChild(name);
+  row.appendChild(profSel);
+  row.appendChild(delBtn);
+  return row;
+}
+
+/* ── 切换下拉菜单 ── */
+function _toggleSkillsDrop(container) {
+  const existing = document.getElementById('skills-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  /* 可选 Skills = 项目所有 skills - 已添加的 */
+  const addedIds = new Set(_skillsData.map(s => s.skill));
+  const available = (projectData?.skills || [])
+    .filter(s => !addedIds.has(s.id));
+
+  const drop = document.createElement('div');
+  drop.className = 'skills-dropdown';
+  drop.id = 'skills-dropdown';
+  drop.addEventListener('click', e => e.stopPropagation());
+
+  /* 搜索框 */
+  const search = document.createElement('input');
+  search.className = 'skills-drop-search';
+  search.placeholder = '🔍 搜索 Skill...';
+  drop.appendChild(search);
+
+  /* 列表容器 */
+  const listEl = document.createElement('div');
+  listEl.className = 'skills-drop-list';
+  drop.appendChild(listEl);
+
+  const renderItems = (items) => {
+    listEl.innerHTML = '';
+    if (items.length === 0) {
+      listEl.innerHTML = '<div class="skills-drop-empty">所有可用 Skill 已添加完毕</div>';
+      return;
+    }
+    items.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'skills-drop-item';
+      item.innerHTML =
+        '<span style="font-size:13px;flex-shrink:0">⚙️</span>' +
+        `<span style="flex:1;font-weight:700">${escHtml(s.id)}</span>` +
+        `<span style="color:var(--tx-m);font-size:10px;white-space:nowrap">${escHtml((s.name||s.id).replace(s.id,'').trim()||'')}</span>`;
+      item.addEventListener('click', () => _addSkill(s.id));
+      listEl.appendChild(item);
+    });
+  };
+
+  renderItems(available);
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    renderItems(available.filter(s =>
+      s.id.toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)
+    ));
+  });
+
+  container.appendChild(drop);
+  setTimeout(() => { search.focus(); }, 30);
+
+  /* 点击外部关闭 */
+  setTimeout(() => {
+    document.addEventListener('click', function onOutside(e) {
+      const d = document.getElementById('skills-dropdown');
+      if (d && !d.contains(e.target)) {
+        d.remove();
+        document.removeEventListener('click', onOutside);
+      }
+    });
+  }, 0);
+}
+
+/* ── 增删技能 ── */
+function _addSkill(skillId) {
+  const drop = document.getElementById('skills-dropdown');
+  if (drop) drop.remove();
+  if (_skillsData.some(s => s.skill === skillId)) {
+    toast('Skill 已存在: ' + skillId, 'm'); return;
+  }
+  _skillsData.push({ skill: skillId, proficiency: 'advanced' });
+  _editSec['skills'] = _dumpSkillsYaml(_skillsData);
+  _rebuildSkillsEditor();
+  toast('已添加 Skill: ' + skillId, 'c');
+}
+
+function _deleteSkill(idx) {
+  const name = _skillsData[idx]?.skill || 'Skill';
+  _skillsData.splice(idx, 1);
+  _editSec['skills'] = _dumpSkillsYaml(_skillsData);
+  _rebuildSkillsEditor();
+  toast('已移除: ' + name, 'm');
+}
+
+/* ════════════════════════════════════════════════════
+   Rules Editor — 可视化规范关联配置
+   功能：列表展示（rule/scope/description）+ 下拉选择 rules 目录文件 + 自由输入
+   ════════════════════════════════════════════════════ */
+
+function _isRulesSec(sec) {
+  return !!(sec && sec.title === 'rules' && window.jsyaml);
+}
+
+function _parseRulesYaml(str) {
+  try {
+    const obj = jsyaml.load(str || '');
+    if (obj && Array.isArray(obj.rules))
+      return JSON.parse(JSON.stringify(obj.rules));
+  } catch(e) {}
+  return [];
+}
+
+function _dumpRulesYaml(arr) {
+  try {
+    return jsyaml.dump({ rules: arr }, {
+      indent: 2, lineWidth: -1, noRefs: true, skipInvalid: true
+    }).trimEnd();
+  } catch(e) { return ''; }
+}
+
+/* ── 从 DOM 同步 rules 数据 ── */
+function _syncRules() {
+  _rulesData.forEach((r, idx) => {
+    const ri = document.getElementById('rule-inp-'   + idx);
+    const si = document.getElementById('rule-scope-' + idx);
+    const di = document.getElementById('rule-desc-'  + idx);
+    if (ri) r.rule        = ri.value;
+    if (si) r.scope       = si.value;
+    if (di) r.description = di.value;
+  });
+}
+
+/* ── 入口：渲染 Rules 编辑器 ── */
+function _renderRulesEditor(sec) {
+  const raw = _editSec[sec.title] !== undefined
+    ? _editSec[sec.title] : (sec.content || '');
+  _rulesData = _parseRulesYaml(raw);
+  _rebuildRulesEditor();
+}
+
+/* ── 重建整个 Rules 编辑器 DOM ── */
+function _rebuildRulesEditor() {
+  const el = document.getElementById('modal-editor');
+  el.innerHTML = '';
+
+  /* 头栏 */
+  const toolbar = document.createElement('div');
+  toolbar.className = 'editor-hdr';
+  toolbar.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">rules</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>' +
+    `<span style="margin-left:auto;font-size:10px;color:var(--tx-m)">${_rulesData.length} 条规范</span>`;
+  el.appendChild(toolbar);
+
+  /* Rules 列表 */
+  const list = document.createElement('div');
+  list.id = 'rules-list';
+  list.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+
+  if (_rulesData.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'wf-empty';
+    empty.innerHTML =
+      '<div class="wf-empty-ico">📋</div>' +
+      '<div class="wf-empty-txt">暂无关联规范，点击「Add Rule」从列表选择或手动输入</div>';
+    list.appendChild(empty);
+  } else {
+    _rulesData.forEach((r, idx) => list.appendChild(_buildRuleCard(r, idx)));
+  }
+  el.appendChild(list);
+
+  /* Add Rule 按钮 + 下拉 */
+  const addWrap = document.createElement('div');
+  addWrap.className = 'rules-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-rule';
+  addBtn.id = 'btn-add-rule';
+  addBtn.innerHTML = '＋ Add Rule ▾';
+  addBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    _toggleRulesDrop(addWrap);
+  });
+  addWrap.appendChild(addBtn);
+  el.appendChild(addWrap);
+}
+
+/* ── 构建单条 Rule 卡片（rule / scope / description 字段） ── */
+function _buildRuleCard(r, idx) {
+  const card = document.createElement('div');
+  card.className = 'rule-card';
+  card.id = 'rule-card-' + idx;
+
+  /* 卡片头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'rule-card-hdr';
+
+  const arrow = document.createElement('span');
+  arrow.className = 'rule-card-arrow';
+  arrow.textContent = '▼';
+  arrow.addEventListener('click', e => { e.stopPropagation(); _toggleRuleCard(idx); });
+
+  const icon = document.createElement('span');
+  icon.style.cssText = 'font-size:12px;flex-shrink:0';
+  icon.textContent = '📋';
+
+  const ruleInp = document.createElement('input');
+  ruleInp.className = 'rule-card-rule-inp';
+  ruleInp.id = 'rule-inp-' + idx;
+  ruleInp.type = 'text';
+  ruleInp.value = r.rule || '';
+  ruleInp.placeholder = '规则名称 / 文件路径...';
+  ruleInp.addEventListener('click', e => e.stopPropagation());
+  ruleInp.addEventListener('input', () => {
+    _syncRules();
+    _editSec['rules'] = _dumpRulesYaml(_rulesData);
+  });
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-rule-del';
+  delBtn.title = '删除此规范';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteRule(idx); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(icon);
+  hdr.appendChild(ruleInp);
+  hdr.appendChild(delBtn);
+  hdr.addEventListener('click', () => _toggleRuleCard(idx));
+
+  /* 卡片体 */
+  const body = document.createElement('div');
+  body.className = 'rule-card-body';
+
+  /* scope 字段 */
+  const scopeRow = document.createElement('div');
+  scopeRow.className = 'wf-field-row';
+  const scopeLbl = document.createElement('div');
+  scopeLbl.className = 'wf-field-lbl';
+  scopeLbl.textContent = 'SCOPE';
+  const scopeInp = document.createElement('input');
+  scopeInp.className = 'wf-input';
+  scopeInp.id = 'rule-scope-' + idx;
+  scopeInp.type = 'text';
+  scopeInp.value = r.scope || '';
+  scopeInp.placeholder = '适用范围（如：所有驱动源码）';
+  scopeInp.addEventListener('input', () => {
+    _syncRules();
+    _editSec['rules'] = _dumpRulesYaml(_rulesData);
+  });
+  scopeRow.appendChild(scopeLbl);
+  scopeRow.appendChild(scopeInp);
+
+  /* description 字段 */
+  const descRow = document.createElement('div');
+  descRow.className = 'wf-field-row';
+  const descLbl = document.createElement('div');
+  descLbl.className = 'wf-field-lbl';
+  descLbl.textContent = 'DESCRIPTION';
+  const descTa = document.createElement('textarea');
+  descTa.className = 'wf-input';
+  descTa.id = 'rule-desc-' + idx;
+  descTa.rows = 3;
+  descTa.style.resize = 'vertical';
+  descTa.style.minHeight = '56px';
+  descTa.value = r.description || '';
+  descTa.placeholder = '规范说明...';
+  descTa.addEventListener('input', () => {
+    _syncRules();
+    _editSec['rules'] = _dumpRulesYaml(_rulesData);
+  });
+  descRow.appendChild(descLbl);
+  descRow.appendChild(descTa);
+
+  body.appendChild(scopeRow);
+  body.appendChild(descRow);
+  card.appendChild(hdr);
+  card.appendChild(body);
+  return card;
+}
+
+/* ── 折叠/展开 Rule 卡片 ── */
+function _toggleRuleCard(idx) {
+  const card = document.getElementById('rule-card-' + idx);
+  if (card) card.classList.toggle('collapsed');
+}
+
+/* ── 切换下拉菜单（rules 目录文件列表） ── */
+function _toggleRulesDrop(container) {
+  const existing = document.getElementById('rules-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  /* 可选 Rules = projectData.rules（rules/ 目录下的 .md 文件） */
+  const available = (projectData?.rules || []);
+
+  const drop = document.createElement('div');
+  drop.className = 'rules-dropdown';
+  drop.id = 'rules-dropdown';
+  drop.addEventListener('click', e => e.stopPropagation());
+
+  /* 搜索框 */
+  const search = document.createElement('input');
+  search.className = 'rules-drop-search';
+  search.placeholder = '🔍 搜索规范文件...';
+  drop.appendChild(search);
+
+  /* 列表容器 */
+  const listEl = document.createElement('div');
+  listEl.className = 'rules-drop-list';
+  drop.appendChild(listEl);
+
+  const renderItems = (items) => {
+    listEl.innerHTML = '';
+    if (items.length === 0) {
+      listEl.innerHTML = '<div class="rules-drop-empty">暂无规范文件（rules/ 目录为空）</div>';
+      return;
+    }
+    items.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'rules-drop-item';
+      item.innerHTML =
+        '<span style="font-size:13px;flex-shrink:0">📋</span>' +
+        `<span style="flex:1;font-weight:700">${escHtml(r.path || r.id)}</span>` +
+        `<span style="color:var(--tx-m);font-size:10px;white-space:nowrap">${escHtml(r.name || '')}</span>`;
+      item.addEventListener('click', () => _addRule(r.path || r.id, r.name || ''));
+      listEl.appendChild(item);
+    });
+  };
+
+  renderItems(available);
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    renderItems(available.filter(r =>
+      (r.id||'').toLowerCase().includes(q) ||
+      (r.name||'').toLowerCase().includes(q) ||
+      (r.path||'').toLowerCase().includes(q)
+    ));
+  });
+
+  container.appendChild(drop);
+  setTimeout(() => { search.focus(); }, 30);
+
+  /* 点击外部关闭 */
+  setTimeout(() => {
+    document.addEventListener('click', function onOutside(e) {
+      const d = document.getElementById('rules-dropdown');
+      if (d && !d.contains(e.target)) {
+        d.remove();
+        document.removeEventListener('click', onOutside);
+      }
+    });
+  }, 0);
+}
+
+/* ── 增删规范 ── */
+function _addRule(ruleId, ruleName) {
+  const drop = document.getElementById('rules-dropdown');
+  if (drop) drop.remove();
+  _rulesData.push({ rule: ruleId, scope: '', description: '' });
+  _editSec['rules'] = _dumpRulesYaml(_rulesData);
+  _rebuildRulesEditor();
+  toast('已添加规范: ' + (ruleName || ruleId), 'c');
+}
+
+function _deleteRule(idx) {
+  _syncRules();
+  const name = _rulesData[idx]?.rule || '规范';
+  _rulesData.splice(idx, 1);
+  _editSec['rules'] = _dumpRulesYaml(_rulesData);
+  _rebuildRulesEditor();
+  toast('已移除规范: ' + name, 'm');
+}
+
+/* ══════════════════════════════════════════════════════
+   TOOLS EDITOR — required / optional 两级可视化编辑
+   每条格式: tools/tool_name  # comment
+   ══════════════════════════════════════════════════════ */
+
+/* ── 检测 tools 节 ── */
+function _isToolsSec(sec) {
+  return !!(sec && sec.title === 'tools' && window.jsyaml);
+}
+
+/* ── 解析/序列化单条工具字符串 ── */
+function _parseToolStr(s) {
+  s = (s || '').trim();
+  const idx = s.indexOf('#');
+  if (idx >= 0) {
+    return { path: s.slice(0, idx).trim(), comment: s.slice(idx + 1).trim() };
+  }
+  return { path: s, comment: '' };
+}
+
+function _dumpToolStr(t) {
+  const p = (t.path || '').trim();
+  const c = (t.comment || '').trim();
+  return c ? p + '  # ' + c : p;
+}
+
+/* ── 解析/序列化 tools YAML ── */
+function _parseToolsYaml(str) {
+  try {
+    let obj = jsyaml.load(str) || {};
+    // 兼容 section content 包含外层 tools: key 的格式
+    if (obj.tools && (obj.tools.required !== undefined || obj.tools.optional !== undefined)) {
+      obj = obj.tools;
+    }
+    return {
+      required: (obj.required || []).map(s => _parseToolStr(String(s))),
+      optional: (obj.optional || []).map(s => _parseToolStr(String(s)))
+    };
+  } catch(e) { return { required: [], optional: [] }; }
+}
+
+function _dumpToolsYaml(data) {
+  const obj = {
+    required: (data.required || []).map(_dumpToolStr),
+    optional: (data.optional || []).map(_dumpToolStr)
+  };
+  return jsyaml.dump(obj, { lineWidth: -1, indent: 2 });
+}
+
+/* ── 从 DOM 同步数据 ── */
+function _syncTools() {
+  ['required', 'optional'].forEach(kind => {
+    const rows = document.querySelectorAll(`.tool-row[data-kind="${kind}"]`);
+    _toolsData[kind] = Array.from(rows).map(row => ({
+      path:    (row.querySelector('.tool-inp-path') ? row.querySelector('.tool-inp-path').value : '').trim(),
+      comment: (row.querySelector('.tool-inp-cmt')  ? row.querySelector('.tool-inp-cmt').value  : '').trim()
+    })).filter(t => t.path);
+  });
+}
+
+/* ── 入口 ── */
+function _renderToolsEditor(sec) {
+  _toolsData = _parseToolsYaml(_editSec[sec.title] || sec.content || '');
+  _rebuildToolsEditor();
+}
+
+function _rebuildToolsEditor() {
+  const ed = document.getElementById('modal-editor');
+  if (!ed) return;
+
+  /* 构建头栏 */
+  const hdrDiv = document.createElement('div');
+  hdrDiv.className = 'editor-hdr';
+  hdrDiv.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">tools</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>';
+
+  /* 构建滚动容器 */
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:12px;';
+
+  scroll.appendChild(_buildToolsSection('required'));
+  scroll.appendChild(_buildToolsSection('optional'));
+
+  ed.innerHTML = '';
+  ed.appendChild(hdrDiv);
+  ed.appendChild(scroll);
+}
+
+/* ── 构建子区块（required / optional） ── */
+function _buildToolsSection(kind) {
+  const kindItems = _toolsData[kind] || [];
+
+  const sec = document.createElement('div');
+  sec.className = 'tools-sec';
+  sec.dataset.kind = kind;
+
+  /* 区块头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'tools-sec-hdr';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'tools-sec-lbl';
+  lbl.textContent = kind === 'required' ? '🔴 Required' : '🟡 Optional';
+
+  const cnt = document.createElement('span');
+  cnt.className = 'tools-sec-cnt';
+  cnt.textContent = kindItems.length + ' items';
+
+  const addWrap = document.createElement('div');
+  addWrap.className = 'tools-add-wrap';
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-tool';
+  addBtn.textContent = '+ Add ' + (kind === 'required' ? 'Required' : 'Optional');
+  addBtn.onclick = function(e) { e.stopPropagation(); _toggleToolsDrop(addWrap, kind); };
+  addWrap.appendChild(addBtn);
+
+  hdr.appendChild(lbl);
+  hdr.appendChild(cnt);
+  hdr.appendChild(addWrap);
+  sec.appendChild(hdr);
+
+  /* 工具列表 */
+  if (kindItems.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'rules-drop-empty';
+    empty.style.cssText = 'padding:10px 0;font-size:11px;color:var(--tx-m);text-align:center;';
+    empty.textContent = '暂无 ' + kind + ' 工具';
+    sec.appendChild(empty);
+  } else {
+    kindItems.forEach((t, idx) => sec.appendChild(_buildToolRow(t, kind, idx)));
+  }
+
+  return sec;
+}
+
+/* ── 构建单条工具行 ── */
+function _buildToolRow(t, kind, idx) {
+  const row = document.createElement('div');
+  row.className = 'tool-row';
+  row.dataset.kind = kind;
+  row.dataset.idx  = String(idx);
+
+  const inner = document.createElement('div');
+  inner.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+  /* path 输入框 */
+  const pathInp = document.createElement('input');
+  pathInp.className = 'tool-inp-path';
+  pathInp.value = t.path || '';
+  pathInp.placeholder = 'tools/tool_name';
+  pathInp.style.cssText = 'flex:1;background:var(--bg-d);border:1px solid var(--bd-light);border-radius:4px;padding:3px 7px;font-size:11px;color:var(--ct);';
+  pathInp.addEventListener('change', () => {
+    _syncTools();
+    _editSec['tools'] = _dumpToolsYaml(_toolsData);
+  });
+
+  /* comment 输入框 */
+  const cmtInp = document.createElement('input');
+  cmtInp.className = 'tool-inp-cmt';
+  cmtInp.value = t.comment || '';
+  cmtInp.placeholder = '# 用途说明';
+  cmtInp.style.cssText = 'flex:1.5;background:var(--bg-d);border:1px solid var(--bd-light);border-radius:4px;padding:3px 7px;font-size:11px;color:var(--tx-m);font-style:italic;';
+  cmtInp.addEventListener('change', () => {
+    _syncTools();
+    _editSec['tools'] = _dumpToolsYaml(_toolsData);
+  });
+
+  /* 删除按钮 */
+  const delBtn = document.createElement('button');
+  delBtn.title = '删除';
+  delBtn.innerHTML = '✕';
+  delBtn.style.cssText = 'background:transparent;border:none;cursor:pointer;color:#e0666688;font-size:14px;padding:0 2px;flex-shrink:0;';
+  delBtn.addEventListener('click', () => _deleteTool(kind, idx));
+
+  inner.appendChild(pathInp);
+  inner.appendChild(cmtInp);
+  inner.appendChild(delBtn);
+  row.appendChild(inner);
+  return row;
+}
+
+/* ── 增删工具 ── */
+function _addTool(kind, toolPath, toolName) {
+  const drop = document.getElementById('tools-dropdown');
+  if (drop) drop.remove();
+  _syncTools();
+  _toolsData[kind].push({ path: toolPath, comment: toolName || '' });
+  _editSec['tools'] = _dumpToolsYaml(_toolsData);
+  _rebuildToolsEditor();
+  toast('已添加工具: ' + toolPath, 'c');
+}
+
+function _deleteTool(kind, idx) {
+  _syncTools();
+  const name = (_toolsData[kind][idx] || {}).path || '工具';
+  _toolsData[kind].splice(idx, 1);
+  _editSec['tools'] = _dumpToolsYaml(_toolsData);
+  _rebuildToolsEditor();
+  toast('已移除工具: ' + name, 'm');
+}
+
+/* ── 下拉菜单（从 projectData.tools 获取可选列表） ── */
+function _toggleToolsDrop(container, kind) {
+  const existing = document.getElementById('tools-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  _syncTools();
+  const currentPaths = new Set([
+    ...(_toolsData.required || []).map(t => t.path),
+    ...(_toolsData.optional  || []).map(t => t.path)
+  ]);
+
+  const allTools = projectData && projectData.tools ? projectData.tools : [];
+  const available = allTools.filter(t => {
+    const p = t.path || t.id || '';
+    return p && !currentPaths.has(p);
+  });
+
+  const drop = document.createElement('div');
+  drop.id = 'tools-dropdown';
+  drop.className = 'tools-dropdown';
+
+  const search = document.createElement('input');
+  search.className = 'tools-search';
+  search.placeholder = '🔍 搜索工具...';
+  drop.appendChild(search);
+
+  const listEl = document.createElement('div');
+  listEl.className = 'tools-list';
+  drop.appendChild(listEl);
+
+  const renderItems = items => {
+    listEl.innerHTML = '';
+    if (!items.length) {
+      listEl.innerHTML = '<div class="tools-empty">暂无可添加工具</div>';
+      return;
+    }
+    items.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'tools-item';
+      const pathVal = t.path || t.id || '';
+      const name    = t.name || t.id || pathVal;
+      const desc    = t.description || '';
+      item.innerHTML =
+        '<strong style="font-size:11px;color:var(--ct)">' + escHtml(pathVal) + '</strong>' +
+        (desc ? '<br><small style="color:var(--tx-m);font-size:10px">' + escHtml(desc) + '</small>' : '');
+      item.addEventListener('click', () => _addTool(kind, pathVal, name));
+      listEl.appendChild(item);
+    });
+  };
+
+  renderItems(available);
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    renderItems(available.filter(t =>
+      (t.id   || '').toLowerCase().includes(q) ||
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.path || '').toLowerCase().includes(q) ||
+      (t.description || '').toLowerCase().includes(q)
+    ));
+  });
+
+  container.appendChild(drop);
+  setTimeout(() => { search.focus(); }, 30);
+
+  /* 点击外部关闭 */
+  setTimeout(() => {
+    document.addEventListener('click', function onOutside(e) {
+      const d = document.getElementById('tools-dropdown');
+      if (!d) {
+        // dropdown 已被手动移除，清理孤儿监听器
+        document.removeEventListener('click', onOutside);
+        return;
+      }
+      if (!d.contains(e.target)) {
+        d.remove();
+        document.removeEventListener('click', onOutside);
+      }
+    });
+  }, 0);
+}
+
+/* ══════════════════════════════════════════════════════
+   KNOWLEDGE EDITOR — source / type / description 三字段可视化编辑
+   每条格式: { source, type, description }
+   ══════════════════════════════════════════════════════ */
+
+/* ── source 路径规范化：确保格式为 knowledge/xxx.md ── */
+function _knNormPath(p) {
+  if (!p) return '';
+  p = p.trim();
+  // 已经是完整路径（含 /）：直接返回
+  if (p.includes('/')) return p;
+  // 裸 ID（无斜杠、无空格）：自动补全
+  if (!p.includes(' ')) {
+    const name = p.endsWith('.md') ? p : p + '.md';
+    return 'knowledge/' + name;
+  }
+  return p; // 外部文档名（含空格）：原样返回
+}
+
+function _isKnowledgeSec(sec) {
+  return !!(sec && (sec.title === 'knowledge' || sec.title === 'knowledges') && window.jsyaml);
+}
+
+/* ── 解析/序列化 knowledge YAML ── */
+function _parseKnowledgeYaml(str) {
+  try {
+    let obj = jsyaml.load(str) || {};
+    let items = [];
+    // 兼容外层 knowledges: / knowledge: wrapper
+    if (obj.knowledges && Array.isArray(obj.knowledges)) {
+      items = obj.knowledges;
+    } else if (obj.knowledge && Array.isArray(obj.knowledge)) {
+      items = obj.knowledge;
+    } else if (Array.isArray(obj)) {
+      items = obj;
+    }
+    return items.map(item => ({
+      source:      String(item.source      || ''),
+      type:        String(item.type        || ''),
+      description: String(item.description || '')
+    }));
+  } catch(e) { return []; }
+}
+
+function _dumpKnowledgeYaml(data) {
+  const items = (data || [])
+    .filter(item => item.source)
+    .map(item => ({
+      source:      item.source,
+      type:        item.type        || '',
+      description: item.description || ''
+    }));
+  const wrapKey = (_knSecTitle === 'knowledges') ? 'knowledges' : 'knowledge';
+  return jsyaml.dump({ [wrapKey]: items }, { lineWidth: -1, indent: 2 });
+}
+
+/* ── 从 DOM 同步数据 ── */
+function _syncKnowledge() {
+  const cards = document.querySelectorAll('.kn-card[data-idx]');
+  _knowledgeData = Array.from(cards).map(card => ({
+    source:      (card.querySelector('.kn-inp-source') ? card.querySelector('.kn-inp-source').value : '').trim(),
+    type:        (card.querySelector('.kn-inp-type')   ? card.querySelector('.kn-inp-type').value   : '').trim(),
+    description: (card.querySelector('.kn-inp-desc')   ? card.querySelector('.kn-inp-desc').value   : '').trim()
+  })).filter(item => item.source);
+}
+
+/* ── 入口 ── */
+function _renderKnowledgeEditor(sec) {
+  _knSecTitle    = sec.title; // 记录真实章节标题（knowledge 或 knowledges）
+  _knowledgeData = _parseKnowledgeYaml(_editSec[sec.title] || sec.content || '');
+  _rebuildKnowledgeEditor();
+}
+
+function _rebuildKnowledgeEditor() {
+  const ed = document.getElementById('modal-editor');
+  if (!ed) return;
+
+  const hdrDiv = document.createElement('div');
+  hdrDiv.className = 'editor-hdr';
+  hdrDiv.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">' + _knSecTitle + '</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>';
+
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;';
+
+  /* 知识条目列表 */
+  const list = document.createElement('div');
+  list.className = 'kn-list';
+  if (_knowledgeData.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:12px 0;font-size:11px;color:var(--tx-m);text-align:center;';
+    empty.textContent = '暂无知识库条目，点击下方按钮添加';
+    list.appendChild(empty);
+  } else {
+    _knowledgeData.forEach((item, idx) => list.appendChild(_buildKnowledgeCard(item, idx)));
+  }
+  scroll.appendChild(list);
+
+  /* Add 按钮 */
+  const addWrap = document.createElement('div');
+  addWrap.className = 'kn-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-kn';
+  addBtn.textContent = '+ Add Knowledge';
+  addBtn.onclick = function(e) { e.stopPropagation(); _toggleKnowledgeDrop(addWrap); };
+  addWrap.appendChild(addBtn);
+  scroll.appendChild(addWrap);
+
+  ed.innerHTML = '';
+  ed.appendChild(hdrDiv);
+  ed.appendChild(scroll);
+}
+
+/* ── 切换知识卡片展开/收缩 ── */
+function _toggleKnowledgeCard(idx) {
+  const card = document.getElementById('kn-card-' + idx);
+  if (card) card.classList.toggle('collapsed');
+}
+
+/* ── 构建单条知识卡片 ── */
+function _buildKnowledgeCard(item, idx) {
+  const card = document.createElement('div');
+  card.className = 'kn-card';          // 默认展开（不加 collapsed）
+  card.id = 'kn-card-' + idx;
+  card.dataset.idx = String(idx);
+
+  /* 卡片头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'kn-card-hdr';
+  hdr.addEventListener('click', () => _toggleKnowledgeCard(idx));
+
+  const arrow = document.createElement('span');
+  arrow.className = 'kn-card-arrow';
+  arrow.textContent = '▼';
+
+  const icon = document.createElement('span');
+  icon.className = 'kn-card-icon';
+  icon.textContent = '📚';
+
+  const srcSpan = document.createElement('span');
+  srcSpan.className = 'kn-card-src';
+  srcSpan.textContent = item.source || '（未命名）';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-kn-del';
+  delBtn.title = '删除此知识条目';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteKnowledge(idx); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(icon);
+  hdr.appendChild(srcSpan);
+  hdr.appendChild(delBtn);
+
+  /* 卡片体 */
+  const body = document.createElement('div');
+  body.className = 'kn-card-body';
+
+  /* source 字段 */
+  const sourceRow = document.createElement('div');
+  sourceRow.className = 'kn-field-row';
+  const sourceLbl = document.createElement('div');
+  sourceLbl.className = 'kn-field-lbl';
+  sourceLbl.textContent = 'SOURCE';
+  const sourceInp = document.createElement('input');
+  sourceInp.className = 'wf-input kn-inp-source';
+  sourceInp.type = 'text';
+  sourceInp.style.fontFamily = 'Consolas,Menlo,monospace';
+  sourceInp.value = item.source || '';
+  sourceInp.placeholder = 'knowledge/xxx.md 或外部文档名';
+  sourceInp.addEventListener('input', () => {
+    srcSpan.textContent = sourceInp.value || '（未命名）';
+    _syncKnowledge();
+    _editSec[_knSecTitle] = _dumpKnowledgeYaml(_knowledgeData);
+  });
+  sourceRow.appendChild(sourceLbl);
+  sourceRow.appendChild(sourceInp);
+
+  /* type 字段 */
+  const typeRow = document.createElement('div');
+  typeRow.className = 'kn-field-row';
+  const typeLbl = document.createElement('div');
+  typeLbl.className = 'kn-field-lbl';
+  typeLbl.textContent = 'TYPE';
+  const typeInp = document.createElement('input');
+  typeInp.className = 'wf-input kn-inp-type';
+  typeInp.type = 'text';
+  typeInp.value = item.type || '';
+  typeInp.placeholder = '内部知识库 / 外部参考文档 / 标准规范...';
+  typeInp.addEventListener('input', () => {
+    _syncKnowledge();
+    _editSec[_knSecTitle] = _dumpKnowledgeYaml(_knowledgeData);
+  });
+  typeRow.appendChild(typeLbl);
+  typeRow.appendChild(typeInp);
+
+  /* description 字段 */
+  const descRow = document.createElement('div');
+  descRow.className = 'kn-field-row';
+  const descLbl = document.createElement('div');
+  descLbl.className = 'kn-field-lbl';
+  descLbl.textContent = 'DESCRIPTION';
+  const descTa = document.createElement('textarea');
+  descTa.className = 'wf-input kn-inp-desc';
+  descTa.rows = 2;
+  descTa.style.resize = 'vertical';
+  descTa.style.minHeight = '44px';
+  descTa.value = item.description || '';
+  descTa.placeholder = '知识库内容说明...';
+  descTa.addEventListener('input', () => {
+    _syncKnowledge();
+    _editSec[_knSecTitle] = _dumpKnowledgeYaml(_knowledgeData);
+  });
+  descRow.appendChild(descLbl);
+  descRow.appendChild(descTa);
+
+  body.appendChild(sourceRow);
+  body.appendChild(typeRow);
+  body.appendChild(descRow);
+  card.appendChild(hdr);
+  card.appendChild(body);
+  return card;
+}
+
+/* ── 增删知识条目 ── */
+function _addKnowledge(sourcePath, sourceName, sourceDesc) {
+  const drop = document.getElementById('kn-dropdown');
+  if (drop) drop.remove();
+  _syncKnowledge();
+  _knowledgeData.push({
+    source:      sourcePath,
+    type:        '内部知识库',
+    description: sourceDesc || ''
+  });
+  _editSec[_knSecTitle] = _dumpKnowledgeYaml(_knowledgeData);
+  _rebuildKnowledgeEditor();
+  toast('已添加知识库: ' + (sourceName || sourcePath), 'c');
+}
+
+function _deleteKnowledge(idx) {
+  _syncKnowledge();
+  const name = (_knowledgeData[idx] || {}).source || '知识条目';
+  _knowledgeData.splice(idx, 1);
+  _editSec[_knSecTitle] = _dumpKnowledgeYaml(_knowledgeData);
+  _rebuildKnowledgeEditor();
+  toast('已移除知识库: ' + name, 'm');
+}
+
+/* ── 下拉菜单（从 projectData.knowledge 获取可选列表） ── */
+function _toggleKnowledgeDrop(container) {
+  const existing = document.getElementById('kn-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  _syncKnowledge();
+  const currentSources = new Set(_knowledgeData.map(k => k.source));
+  const allKn = projectData && projectData.knowledge ? projectData.knowledge : [];
+  const available = allKn.filter(k => {
+    const p = k.path || k.id || '';
+    return p && !currentSources.has(p);
+  });
+
+  const drop = document.createElement('div');
+  drop.id = 'kn-dropdown';
+  drop.className = 'kn-dropdown';
+  drop.addEventListener('click', e => e.stopPropagation());
+
+  const search = document.createElement('input');
+  search.className = 'kn-drop-search';
+  search.placeholder = '🔍 搜索知识文件...';
+  drop.appendChild(search);
+
+  const listEl = document.createElement('div');
+  listEl.className = 'kn-drop-list';
+  drop.appendChild(listEl);
+
+  const renderItems = items => {
+    listEl.innerHTML = '';
+    if (!items.length) {
+      listEl.innerHTML = '<div class="kn-drop-empty">暂无可添加的知识文件</div>';
+      return;
+    }
+    items.forEach(k => {
+      const item = document.createElement('div');
+      item.className = 'kn-drop-item';
+      // 确保路径格式为 knowledge/xxx.md
+      const pathVal = _knNormPath(k.path || k.id || '');
+      const name    = k.name || k.id || pathVal;
+      const desc    = k.description || '';
+      item.innerHTML =
+        '<span style="font-size:11px;font-family:Consolas,Menlo,monospace;color:#4a9eff;font-weight:600">' +
+          escHtml(pathVal) +
+        '</span>' +
+        (desc ? '<br><small style="color:var(--tx-m);font-size:10px">' + escHtml(desc) + '</small>' : '');
+      item.addEventListener('click', () => _addKnowledge(pathVal, name, desc));
+      listEl.appendChild(item);
+    });
+  };
+
+  renderItems(available);
+  search.addEventListener('input', () => {
+    const q = search.value.toLowerCase();
+    renderItems(available.filter(k =>
+      (k.id   || '').toLowerCase().includes(q) ||
+      (k.name || '').toLowerCase().includes(q) ||
+      (k.path || '').toLowerCase().includes(q) ||
+      (k.description || '').toLowerCase().includes(q)
+    ));
+  });
+
+  container.appendChild(drop);
+  setTimeout(() => { search.focus(); }, 30);
+
+  /* 点击外部关闭 */
+  setTimeout(() => {
+    document.addEventListener('click', function onOutside(e) {
+      const d = document.getElementById('kn-dropdown');
+      if (!d) {
+        document.removeEventListener('click', onOutside);
+        return;
+      }
+      if (!d.contains(e.target)) {
+        d.remove();
+        document.removeEventListener('click', onOutside);
+      }
+    });
+  }, 0);
+}
+
+/* ══════════════════════════════════════════════════════
+   MULTI-AGENT-COLLABORATION EDITOR
+   每条格式: { pattern, description, use_when }
+   ══════════════════════════════════════════════════════ */
+
+function _isMacSec(sec) {
+  return !!(sec && sec.title === 'multi-agent-collaboration' && window.jsyaml);
+}
+
+function _parseMacYaml(str) {
+  try {
+    let obj = jsyaml.load(str) || {};
+    let items = [];
+    if (obj['multi-agent-collaboration'] && Array.isArray(obj['multi-agent-collaboration'])) {
+      items = obj['multi-agent-collaboration'];
+    } else if (Array.isArray(obj)) {
+      items = obj;
+    }
+    return items.map(item => ({
+      pattern:     String(item.pattern     || ''),
+      description: String(item.description || ''),
+      use_when:    String(item.use_when    || '')
+    }));
+  } catch(e) { return []; }
+}
+
+function _dumpMacYaml(data) {
+  const items = (data || [])
+    .filter(item => item.pattern)
+    .map(item => ({
+      pattern:     item.pattern,
+      description: item.description || '',
+      use_when:    item.use_when    || ''
+    }));
+  return jsyaml.dump({ 'multi-agent-collaboration': items }, { lineWidth: -1, indent: 2 });
+}
+
+function _syncMac() {
+  const cards = document.querySelectorAll('.mac-card[data-idx]');
+  // 不在 sync 时过滤空白条目，保留正在编辑的新卡片；过滤仅在 dump 时执行
+  _macData = Array.from(cards).map(card => ({
+    pattern:     (card.querySelector('.mac-inp-pattern') ? card.querySelector('.mac-inp-pattern').value : '').trim(),
+    description: (card.querySelector('.mac-inp-desc')    ? card.querySelector('.mac-inp-desc').value    : '').trim(),
+    use_when:    (card.querySelector('.mac-inp-use')     ? card.querySelector('.mac-inp-use').value      : '').trim()
+  }));
+}
+
+function _renderMacEditor(sec) {
+  _macData = _parseMacYaml(_editSec[sec.title] || sec.content || '');
+  _rebuildMacEditor();
+}
+
+function _rebuildMacEditor() {
+  const ed = document.getElementById('modal-editor');
+  if (!ed) return;
+
+  const hdrDiv = document.createElement('div');
+  hdrDiv.className = 'editor-hdr';
+  hdrDiv.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">multi-agent-collaboration</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>';
+
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;';
+
+  const list = document.createElement('div');
+  list.className = 'kn-list';
+  if (_macData.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:12px 0;font-size:11px;color:var(--tx-m);text-align:center;';
+    empty.textContent = '暂无协作模式条目，点击下方按钮添加';
+    list.appendChild(empty);
+  } else {
+    _macData.forEach((item, idx) => list.appendChild(_buildMacCard(item, idx)));
+  }
+  scroll.appendChild(list);
+
+  const addWrap = document.createElement('div');
+  addWrap.className = 'kn-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-kn';
+  addBtn.textContent = '+ Add Collaboration Pattern';
+  addBtn.onclick = function() { _addMac(); };
+  addWrap.appendChild(addBtn);
+  scroll.appendChild(addWrap);
+
+  ed.innerHTML = '';
+  ed.appendChild(hdrDiv);
+  ed.appendChild(scroll);
+}
+
+function _toggleMacCard(idx) {
+  const card = document.getElementById('mac-card-' + idx);
+  if (card) card.classList.toggle('collapsed');
+}
+
+function _buildMacCard(item, idx) {
+  const card = document.createElement('div');
+  card.className = 'kn-card mac-card';   // mac-card 用于 _syncMac querySelectorAll
+  card.id = 'mac-card-' + idx;
+  card.dataset.idx = String(idx);
+
+  /* 卡片头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'kn-card-hdr';
+  hdr.addEventListener('click', () => _toggleMacCard(idx));
+
+  const arrow = document.createElement('span');
+  arrow.className = 'kn-card-arrow';
+  arrow.textContent = '▼';
+
+  const icon = document.createElement('span');
+  icon.className = 'kn-card-icon';
+  icon.textContent = '🤝';
+
+  const patternSpan = document.createElement('span');
+  patternSpan.className = 'kn-card-src';
+  patternSpan.textContent = item.pattern || '（未命名）';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-kn-del';
+  delBtn.title = '删除此协作模式';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteMac(idx); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(icon);
+  hdr.appendChild(patternSpan);
+  hdr.appendChild(delBtn);
+
+  /* 卡片体 */
+  const body = document.createElement('div');
+  body.className = 'kn-card-body';
+
+  /* pattern 字段 */
+  const patternRow = document.createElement('div');
+  patternRow.className = 'kn-field-row';
+  const patternLbl = document.createElement('div');
+  patternLbl.className = 'kn-field-lbl';
+  patternLbl.textContent = 'PATTERN';
+  const patternInp = document.createElement('input');
+  patternInp.className = 'wf-input mac-inp-pattern';
+  patternInp.type = 'text';
+  patternInp.value = item.pattern || '';
+  patternInp.placeholder = 'Sequential handoff / Parallel consultation / ...';
+  patternInp.addEventListener('input', () => {
+    patternSpan.textContent = patternInp.value || '（未命名）';
+    _syncMac();
+    _editSec['multi-agent-collaboration'] = _dumpMacYaml(_macData);
+  });
+  patternRow.appendChild(patternLbl);
+  patternRow.appendChild(patternInp);
+
+  /* description 字段 */
+  const descRow = document.createElement('div');
+  descRow.className = 'kn-field-row';
+  const descLbl = document.createElement('div');
+  descLbl.className = 'kn-field-lbl';
+  descLbl.textContent = 'DESCRIPTION';
+  const descTa = document.createElement('textarea');
+  descTa.className = 'wf-input mac-inp-desc';
+  descTa.rows = 2;
+  descTa.style.resize = 'vertical';
+  descTa.style.minHeight = '44px';
+  descTa.value = item.description || '';
+  descTa.placeholder = '协作模式描述...';
+  descTa.addEventListener('input', () => {
+    _syncMac();
+    _editSec['multi-agent-collaboration'] = _dumpMacYaml(_macData);
+  });
+  descRow.appendChild(descLbl);
+  descRow.appendChild(descTa);
+
+  /* use_when 字段 */
+  const useRow = document.createElement('div');
+  useRow.className = 'kn-field-row';
+  const useLbl = document.createElement('div');
+  useLbl.className = 'kn-field-lbl';
+  useLbl.textContent = 'USE WHEN';
+  const useTa = document.createElement('textarea');
+  useTa.className = 'wf-input mac-inp-use';
+  useTa.rows = 2;
+  useTa.style.resize = 'vertical';
+  useTa.style.minHeight = '44px';
+  useTa.value = item.use_when || '';
+  useTa.placeholder = '触发该协作模式的条件...';
+  useTa.addEventListener('input', () => {
+    _syncMac();
+    _editSec['multi-agent-collaboration'] = _dumpMacYaml(_macData);
+  });
+  useRow.appendChild(useLbl);
+  useRow.appendChild(useTa);
+
+  body.appendChild(patternRow);
+  body.appendChild(descRow);
+  body.appendChild(useRow);
+  card.appendChild(hdr);
+  card.appendChild(body);
+  return card;
+}
+
+function _addMac() {
+  _syncMac();
+  _macData.push({ pattern: '', description: '', use_when: '' });
+  _editSec['multi-agent-collaboration'] = _dumpMacYaml(_macData);
+  _rebuildMacEditor();
+  // 新卡片自动获得焦点
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.mac-card[data-idx]');
+    const last = cards[cards.length - 1];
+    if (last) {
+      const inp = last.querySelector('.mac-inp-pattern');
+      if (inp) inp.focus();
+    }
+  }, 30);
+}
+
+function _deleteMac(idx) {
+  _syncMac();
+  const name = (_macData[idx] || {}).pattern || '协作模式';
+  _macData.splice(idx, 1);
+  _editSec['multi-agent-collaboration'] = _dumpMacYaml(_macData);
+  _rebuildMacEditor();
+  toast('已移除协作模式: ' + name, 'm');
+}
+
+/* ══════════════════════════════════════════════════════
+   HUMAN_CHECKS EDITOR
+   每条格式: { condition, action }
+   卡片默认名称取自 condition 的前缀关键字
+   ══════════════════════════════════════════════════════ */
+
+function _isHcSec(sec) {
+  return !!(sec && sec.title === 'human_checks' && window.jsyaml);
+}
+
+/* 从 condition 提取卡片显示名（最多 24 字，遇到标点截断） */
+function _hcCardName(condition) {
+  if (!condition || !condition.trim()) return '（未命名）';
+  const s = condition.trim();
+  const m = s.match(/^([\s\S]{1,24})[\s,，。；;（(]/);
+  return (m ? m[1].trim() : s.slice(0, 24)) || '（未命名）';
+}
+
+function _parseHcYaml(str) {
+  try {
+    let obj = jsyaml.load(str) || {};
+    let items = [];
+    if (obj.human_checks && Array.isArray(obj.human_checks)) {
+      items = obj.human_checks;
+    } else if (Array.isArray(obj)) {
+      items = obj;
+    }
+    return items.map(item => ({
+      condition: String(item.condition || ''),
+      action:    String(item.action    || '')
+    }));
+  } catch(e) { return []; }
+}
+
+function _dumpHcYaml(data) {
+  const items = (data || [])
+    .filter(item => item.condition || item.action)
+    .map(item => ({
+      condition: item.condition || '',
+      action:    item.action    || ''
+    }));
+  return jsyaml.dump({ human_checks: items }, { lineWidth: -1, indent: 2 });
+}
+
+function _syncHc() {
+  const cards = document.querySelectorAll('.hc-card[data-idx]');
+  // 不在 sync 时过滤空白条目，保留正在编辑的新卡片；过滤仅在 dump 时执行
+  _hcData = Array.from(cards).map(card => ({
+    condition: (card.querySelector('.hc-inp-cond') ? card.querySelector('.hc-inp-cond').value : '').trim(),
+    action:    (card.querySelector('.hc-inp-act')  ? card.querySelector('.hc-inp-act').value  : '').trim()
+  }));
+}
+
+function _renderHcEditor(sec) {
+  _hcData = _parseHcYaml(_editSec[sec.title] || sec.content || '');
+  _rebuildHcEditor();
+}
+
+function _rebuildHcEditor() {
+  const ed = document.getElementById('modal-editor');
+  if (!ed) return;
+
+  const hdrDiv = document.createElement('div');
+  hdrDiv.className = 'editor-hdr';
+  hdrDiv.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">human_checks</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>';
+
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;';
+
+  const list = document.createElement('div');
+  list.className = 'kn-list';
+  if (_hcData.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:12px 0;font-size:11px;color:var(--tx-m);text-align:center;';
+    empty.textContent = '暂无人工检查条目，点击下方按钮添加';
+    list.appendChild(empty);
+  } else {
+    _hcData.forEach((item, idx) => list.appendChild(_buildHcCard(item, idx)));
+  }
+  scroll.appendChild(list);
+
+  const addWrap = document.createElement('div');
+  addWrap.className = 'kn-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-kn';
+  addBtn.textContent = '+ Add Human Check';
+  addBtn.onclick = function() { _addHc(); };
+  addWrap.appendChild(addBtn);
+  scroll.appendChild(addWrap);
+
+  ed.innerHTML = '';
+  ed.appendChild(hdrDiv);
+  ed.appendChild(scroll);
+}
+
+function _toggleHcCard(idx) {
+  const card = document.getElementById('hc-card-' + idx);
+  if (card) card.classList.toggle('collapsed');
+}
+
+function _buildHcCard(item, idx) {
+  const card = document.createElement('div');
+  card.className = 'kn-card hc-card';   // hc-card 用于 _syncHc querySelectorAll
+  card.id = 'hc-card-' + idx;
+  card.dataset.idx = String(idx);
+
+  /* 卡片头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'kn-card-hdr';
+  hdr.addEventListener('click', () => _toggleHcCard(idx));
+
+  const arrow = document.createElement('span');
+  arrow.className = 'kn-card-arrow';
+  arrow.textContent = '▼';
+
+  const icon = document.createElement('span');
+  icon.className = 'kn-card-icon';
+  icon.textContent = '🔍';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'kn-card-src';
+  nameSpan.textContent = _hcCardName(item.condition);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-kn-del';
+  delBtn.title = '删除此检查条目';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteHc(idx); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(icon);
+  hdr.appendChild(nameSpan);
+  hdr.appendChild(delBtn);
+
+  /* 卡片体 */
+  const body = document.createElement('div');
+  body.className = 'kn-card-body';
+
+  /* condition 字段 */
+  const condRow = document.createElement('div');
+  condRow.className = 'kn-field-row';
+  const condLbl = document.createElement('div');
+  condLbl.className = 'kn-field-lbl';
+  condLbl.textContent = 'CONDITION';
+  const condTa = document.createElement('textarea');
+  condTa.className = 'wf-input hc-inp-cond';
+  condTa.rows = 2;
+  condTa.style.resize = 'vertical';
+  condTa.style.minHeight = '44px';
+  condTa.value = item.condition || '';
+  condTa.placeholder = '触发人工检查的条件描述...';
+  condTa.addEventListener('input', () => {
+    nameSpan.textContent = _hcCardName(condTa.value);
+    _syncHc();
+    _editSec['human_checks'] = _dumpHcYaml(_hcData);
+  });
+  condRow.appendChild(condLbl);
+  condRow.appendChild(condTa);
+
+  /* action 字段 */
+  const actRow = document.createElement('div');
+  actRow.className = 'kn-field-row';
+  const actLbl = document.createElement('div');
+  actLbl.className = 'kn-field-lbl';
+  actLbl.textContent = 'ACTION';
+  const actTa = document.createElement('textarea');
+  actTa.className = 'wf-input hc-inp-act';
+  actTa.rows = 2;
+  actTa.style.resize = 'vertical';
+  actTa.style.minHeight = '44px';
+  actTa.value = item.action || '';
+  actTa.placeholder = '需要执行的人工处理动作...';
+  actTa.addEventListener('input', () => {
+    _syncHc();
+    _editSec['human_checks'] = _dumpHcYaml(_hcData);
+  });
+  actRow.appendChild(actLbl);
+  actRow.appendChild(actTa);
+
+  body.appendChild(condRow);
+  body.appendChild(actRow);
+  card.appendChild(hdr);
+  card.appendChild(body);
+  return card;
+}
+
+function _addHc() {
+  _syncHc();
+  _hcData.push({ condition: '', action: '' });
+  _editSec['human_checks'] = _dumpHcYaml(_hcData);
+  _rebuildHcEditor();
+  // 新卡片自动聚焦 condition 输入框
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.hc-card[data-idx]');
+    const last = cards[cards.length - 1];
+    if (last) {
+      const ta = last.querySelector('.hc-inp-cond');
+      if (ta) ta.focus();
+    }
+  }, 30);
+}
+
+function _deleteHc(idx) {
+  _syncHc();
+  const name = _hcCardName((_hcData[idx] || {}).condition || '');
+  _hcData.splice(idx, 1);
+  _editSec['human_checks'] = _dumpHcYaml(_hcData);
+  _rebuildHcEditor();
+  toast('已移除检查条目: ' + name, 'm');
+}
+
+/* ══════════════════════════════════════════════════════
+   OUTPUT_FORMATS EDITOR
+   每条格式: { format, template }
+   卡片默认名称取自 format 字段内容
+   ══════════════════════════════════════════════════════ */
+
+function _isOfSec(sec) {
+  return !!(sec && sec.title === 'output_formats' && window.jsyaml);
+}
+
+function _parseOfYaml(str) {
+  try {
+    let obj = jsyaml.load(str) || {};
+    let items = [];
+    if (obj.output_formats && Array.isArray(obj.output_formats)) {
+      items = obj.output_formats;
+    } else if (Array.isArray(obj)) {
+      items = obj;
+    }
+    return items.map(item => ({
+      format:   String(item.format   || ''),
+      template: String(item.template || '')
+    }));
+  } catch(e) { return []; }
+}
+
+function _dumpOfYaml(data) {
+  const items = (data || [])
+    .filter(item => item.format || item.template)
+    .map(item => ({
+      format:   item.format   || '',
+      template: item.template || ''
+    }));
+  return jsyaml.dump({ output_formats: items }, { lineWidth: -1, indent: 2 });
+}
+
+function _syncOf() {
+  const cards = document.querySelectorAll('.of-card[data-idx]');
+  // 不在 sync 时过滤空白条目，保留正在编辑的新卡片；过滤仅在 dump 时执行
+  _ofData = Array.from(cards).map(card => ({
+    format:   (card.querySelector('.of-inp-fmt')  ? card.querySelector('.of-inp-fmt').value  : '').trim(),
+    template: (card.querySelector('.of-inp-tmpl') ? card.querySelector('.of-inp-tmpl').value : '')
+  }));
+}
+
+function _renderOfEditor(sec) {
+  _ofData = _parseOfYaml(_editSec[sec.title] || sec.content || '');
+  _rebuildOfEditor();
+}
+
+function _rebuildOfEditor() {
+  const ed = document.getElementById('modal-editor');
+  if (!ed) return;
+
+  const hdrDiv = document.createElement('div');
+  hdrDiv.className = 'editor-hdr';
+  hdrDiv.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">output_formats</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>';
+
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;';
+
+  const list = document.createElement('div');
+  list.className = 'kn-list';
+  if (_ofData.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:12px 0;font-size:11px;color:var(--tx-m);text-align:center;';
+    empty.textContent = '暂无输出格式条目，点击下方按钮添加';
+    list.appendChild(empty);
+  } else {
+    _ofData.forEach((item, idx) => list.appendChild(_buildOfCard(item, idx)));
+  }
+  scroll.appendChild(list);
+
+  const addWrap = document.createElement('div');
+  addWrap.className = 'kn-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-kn';
+  addBtn.textContent = '+ Add Output Format';
+  addBtn.onclick = function() { _addOf(); };
+  addWrap.appendChild(addBtn);
+  scroll.appendChild(addWrap);
+
+  ed.innerHTML = '';
+  ed.appendChild(hdrDiv);
+  ed.appendChild(scroll);
+}
+
+function _toggleOfCard(idx) {
+  const card = document.getElementById('of-card-' + idx);
+  if (card) card.classList.toggle('collapsed');
+}
+
+function _buildOfCard(item, idx) {
+  const card = document.createElement('div');
+  card.className = 'kn-card of-card';   // of-card 用于 _syncOf querySelectorAll
+  card.id = 'of-card-' + idx;
+  card.dataset.idx = String(idx);
+
+  /* 卡片头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'kn-card-hdr';
+  hdr.addEventListener('click', () => _toggleOfCard(idx));
+
+  const arrow = document.createElement('span');
+  arrow.className = 'kn-card-arrow';
+  arrow.textContent = '▼';
+
+  const icon = document.createElement('span');
+  icon.className = 'kn-card-icon';
+  icon.textContent = '📄';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'kn-card-src';
+  nameSpan.textContent = item.format || '（未命名）';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-kn-del';
+  delBtn.title = '删除此输出格式';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deleteOf(idx); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(icon);
+  hdr.appendChild(nameSpan);
+  hdr.appendChild(delBtn);
+
+  /* 卡片体 */
+  const body = document.createElement('div');
+  body.className = 'kn-card-body';
+
+  /* format 字段 */
+  const fmtRow = document.createElement('div');
+  fmtRow.className = 'kn-field-row';
+  const fmtLbl = document.createElement('div');
+  fmtLbl.className = 'kn-field-lbl';
+  fmtLbl.textContent = 'FORMAT';
+  const fmtInp = document.createElement('input');
+  fmtInp.className = 'wf-input of-inp-fmt';
+  fmtInp.type = 'text';
+  fmtInp.value = item.format || '';
+  fmtInp.placeholder = 'C 驱动源码 / 配置头文件 / 单元测试文件 / 评审报告 / ...';
+  fmtInp.addEventListener('input', () => {
+    nameSpan.textContent = fmtInp.value || '（未命名）';
+    _syncOf();
+    _editSec['output_formats'] = _dumpOfYaml(_ofData);
+  });
+  fmtRow.appendChild(fmtLbl);
+  fmtRow.appendChild(fmtInp);
+
+  /* template 字段 */
+  const tmplRow = document.createElement('div');
+  tmplRow.className = 'kn-field-row';
+  const tmplLbl = document.createElement('div');
+  tmplLbl.className = 'kn-field-lbl';
+  tmplLbl.textContent = 'TEMPLATE';
+  const tmplTa = document.createElement('textarea');
+  tmplTa.className = 'wf-input of-inp-tmpl';
+  tmplTa.rows = 3;
+  tmplTa.style.resize = 'vertical';
+  tmplTa.style.minHeight = '60px';
+  tmplTa.value = item.template || '';
+  tmplTa.placeholder = '输出模板描述，可含多行格式示例...';
+  tmplTa.addEventListener('input', () => {
+    _syncOf();
+    _editSec['output_formats'] = _dumpOfYaml(_ofData);
+  });
+  tmplRow.appendChild(tmplLbl);
+  tmplRow.appendChild(tmplTa);
+
+  body.appendChild(fmtRow);
+  body.appendChild(tmplRow);
+  card.appendChild(hdr);
+  card.appendChild(body);
+  return card;
+}
+
+function _addOf() {
+  _syncOf();
+  _ofData.push({ format: '', template: '' });
+  _editSec['output_formats'] = _dumpOfYaml(_ofData);
+  _rebuildOfEditor();
+  // 新卡片自动聚焦 format 输入框
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.of-card[data-idx]');
+    const last = cards[cards.length - 1];
+    if (last) {
+      const inp = last.querySelector('.of-inp-fmt');
+      if (inp) inp.focus();
+    }
+  }, 30);
+}
+
+function _deleteOf(idx) {
+  _syncOf();
+  const name = (_ofData[idx] || {}).format || '输出格式';
+  _ofData.splice(idx, 1);
+  _editSec['output_formats'] = _dumpOfYaml(_ofData);
+  _rebuildOfEditor();
+  toast('已移除输出格式: ' + name, 'm');
+}
+
+/* ══════════════════════════════════════════════════════
+   PERFORMANCE_METRICS EDITOR
+   每条格式: { metric, target }
+   卡片名称：metric 为主；metric 为空时取 target 前缀关键字
+   ══════════════════════════════════════════════════════ */
+
+function _isPmSec(sec) {
+  return !!(sec && sec.title === 'performance_metrics' && window.jsyaml);
+}
+
+/* 从 target 提取关键字（最多 24 字，遇到标点截断） */
+function _pmCardName(metric, target) {
+  if (metric && metric.trim()) return metric.trim();
+  if (!target || !target.trim()) return '（未命名）';
+  const s = target.trim();
+  const m = s.match(/^([\s\S]{1,24})[\s,，。；;≥≤<>]/);
+  return (m ? m[1].trim() : s.slice(0, 24)) || '（未命名）';
+}
+
+function _parsePmYaml(str) {
+  try {
+    let obj = jsyaml.load(str) || {};
+    let items = [];
+    if (obj.performance_metrics && Array.isArray(obj.performance_metrics)) {
+      items = obj.performance_metrics;
+    } else if (Array.isArray(obj)) {
+      items = obj;
+    }
+    return items.map(item => ({
+      metric: String(item.metric || ''),
+      target: String(item.target || '')
+    }));
+  } catch(e) { return []; }
+}
+
+function _dumpPmYaml(data) {
+  const items = (data || [])
+    .filter(item => item.metric || item.target)
+    .map(item => ({
+      metric: item.metric || '',
+      target: item.target || ''
+    }));
+  return jsyaml.dump({ performance_metrics: items }, { lineWidth: -1, indent: 2 });
+}
+
+function _syncPm() {
+  const cards = document.querySelectorAll('.pm-card[data-idx]');
+  _pmData = Array.from(cards).map(card => ({
+    metric: (card.querySelector('.pm-inp-metric') ? card.querySelector('.pm-inp-metric').value : '').trim(),
+    target: (card.querySelector('.pm-inp-target') ? card.querySelector('.pm-inp-target').value : '').trim()
+  }));
+}
+
+function _renderPmEditor(sec) {
+  _pmData = _parsePmYaml(_editSec[sec.title] || sec.content || '');
+  _rebuildPmEditor();
+}
+
+function _rebuildPmEditor() {
+  const ed = document.getElementById('modal-editor');
+  if (!ed) return;
+
+  const hdrDiv = document.createElement('div');
+  hdrDiv.className = 'editor-hdr';
+  hdrDiv.innerHTML =
+    '<span class="editor-level">##</span>' +
+    '<span class="editor-ttl">performance_metrics</span>' +
+    '<span class="editor-tag csec-tag-yaml"></span>';
+
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'flex:1;overflow-y:auto;padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;';
+
+  const list = document.createElement('div');
+  list.className = 'kn-list';
+  if (_pmData.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:12px 0;font-size:11px;color:var(--tx-m);text-align:center;';
+    empty.textContent = '暂无性能指标条目，点击下方按钮添加';
+    list.appendChild(empty);
+  } else {
+    _pmData.forEach((item, idx) => list.appendChild(_buildPmCard(item, idx)));
+  }
+  scroll.appendChild(list);
+
+  const addWrap = document.createElement('div');
+  addWrap.className = 'kn-add-wrap';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn-add-kn';
+  addBtn.textContent = '+ Add Performance Metric';
+  addBtn.onclick = function() { _addPm(); };
+  addWrap.appendChild(addBtn);
+  scroll.appendChild(addWrap);
+
+  ed.innerHTML = '';
+  ed.appendChild(hdrDiv);
+  ed.appendChild(scroll);
+}
+
+function _togglePmCard(idx) {
+  const card = document.getElementById('pm-card-' + idx);
+  if (card) card.classList.toggle('collapsed');
+}
+
+function _buildPmCard(item, idx) {
+  const card = document.createElement('div');
+  card.className = 'kn-card pm-card';   // pm-card 用于 _syncPm querySelectorAll
+  card.id = 'pm-card-' + idx;
+  card.dataset.idx = String(idx);
+
+  /* 卡片头 */
+  const hdr = document.createElement('div');
+  hdr.className = 'kn-card-hdr';
+  hdr.addEventListener('click', () => _togglePmCard(idx));
+
+  const arrow = document.createElement('span');
+  arrow.className = 'kn-card-arrow';
+  arrow.textContent = '▼';
+
+  const icon = document.createElement('span');
+  icon.className = 'kn-card-icon';
+  icon.textContent = '📊';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'kn-card-src';
+  nameSpan.textContent = _pmCardName(item.metric, item.target);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-kn-del';
+  delBtn.title = '删除此性能指标';
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', e => { e.stopPropagation(); _deletePm(idx); });
+
+  hdr.appendChild(arrow);
+  hdr.appendChild(icon);
+  hdr.appendChild(nameSpan);
+  hdr.appendChild(delBtn);
+
+  /* 卡片体 */
+  const body = document.createElement('div');
+  body.className = 'kn-card-body';
+
+  /* metric 字段 */
+  const metricRow = document.createElement('div');
+  metricRow.className = 'kn-field-row';
+  const metricLbl = document.createElement('div');
+  metricLbl.className = 'kn-field-lbl';
+  metricLbl.textContent = 'METRIC';
+  const metricInp = document.createElement('input');
+  metricInp.className = 'wf-input pm-inp-metric';
+  metricInp.type = 'text';
+  metricInp.value = item.metric || '';
+  metricInp.placeholder = '代码质量 / 测试覆盖率 / 故障响应时间 / ...';
+  metricInp.addEventListener('input', () => {
+    // metric 为主；metric 为空时回退到 target 关键字
+    const targetVal = card.querySelector('.pm-inp-target') ? card.querySelector('.pm-inp-target').value : '';
+    nameSpan.textContent = _pmCardName(metricInp.value, targetVal);
+    _syncPm();
+    _editSec['performance_metrics'] = _dumpPmYaml(_pmData);
+  });
+  metricRow.appendChild(metricLbl);
+  metricRow.appendChild(metricInp);
+
+  /* target 字段 */
+  const targetRow = document.createElement('div');
+  targetRow.className = 'kn-field-row';
+  const targetLbl = document.createElement('div');
+  targetLbl.className = 'kn-field-lbl';
+  targetLbl.textContent = 'TARGET';
+  const targetTa = document.createElement('textarea');
+  targetTa.className = 'wf-input pm-inp-target';
+  targetTa.rows = 2;
+  targetTa.style.resize = 'vertical';
+  targetTa.style.minHeight = '44px';
+  targetTa.value = item.target || '';
+  targetTa.placeholder = '具体指标目标值，如：覆盖率 ≥ 95%，响应时间 ≤ 1ms ...';
+  targetTa.addEventListener('input', () => {
+    // metric 为空时，target 关键字作为卡片名称
+    if (!metricInp.value.trim()) {
+      nameSpan.textContent = _pmCardName('', targetTa.value);
+    }
+    _syncPm();
+    _editSec['performance_metrics'] = _dumpPmYaml(_pmData);
+  });
+  targetRow.appendChild(targetLbl);
+  targetRow.appendChild(targetTa);
+
+  body.appendChild(metricRow);
+  body.appendChild(targetRow);
+  card.appendChild(hdr);
+  card.appendChild(body);
+  return card;
+}
+
+function _addPm() {
+  _syncPm();
+  _pmData.push({ metric: '', target: '' });
+  _editSec['performance_metrics'] = _dumpPmYaml(_pmData);
+  _rebuildPmEditor();
+  // 新卡片自动聚焦 metric 输入框
+  setTimeout(() => {
+    const cards = document.querySelectorAll('.pm-card[data-idx]');
+    const last = cards[cards.length - 1];
+    if (last) {
+      const inp = last.querySelector('.pm-inp-metric');
+      if (inp) inp.focus();
+    }
+  }, 30);
+}
+
+function _deletePm(idx) {
+  _syncPm();
+  const item = _pmData[idx] || {};
+  const name = _pmCardName(item.metric, item.target);
+  _pmData.splice(idx, 1);
+  _editSec['performance_metrics'] = _dumpPmYaml(_pmData);
+  _rebuildPmEditor();
+  toast('已移除性能指标: ' + name, 'm');
+}
+
+/* ────────── Create Agent Modal ────────── */
+function openCreateAgentModal() {
+  const modal = document.getElementById('create-agent-modal');
+  modal.classList.add('open');
+  setTimeout(() => {
+    const inp = document.getElementById('create-agent-name');
+    if (inp) { inp.value = ''; inp.focus(); inp.style.borderColor = ''; }
+  }, 60);
+}
+
+function closeCreateAgentModal() {
+  document.getElementById('create-agent-modal').classList.remove('open');
+}
+
+async function doCreateAgent() {
+  const nameInp = document.getElementById('create-agent-name');
+  // 规范化：小写，只保留字母数字短横线
+  const raw = (nameInp.value || '').trim();
+  const agentName = raw.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+  if (!agentName) {
+    nameInp.focus();
+    nameInp.style.borderColor = 'var(--cr)';
+    nameInp.style.boxShadow = '0 0 0 2px rgba(248,81,73,.18)';
+    setTimeout(() => { nameInp.style.borderColor = ''; nameInp.style.boxShadow = ''; }, 1400);
+    toast('请输入有效的 Agent 名称', 'd');
+    return;
+  }
+
+  const btn = document.getElementById('create-agent-btn');
+  btn.classList.add('saving');
+  btn.textContent = '⏳ 创建中...';
+
+  try {
+    const resp = await fetch('/api/create_agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_name: agentName })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      toast('✅ Agent 已创建: ' + (data.path || agentName), 'c');
+      closeCreateAgentModal();
+      // 切换到 Agents tab 并高亮新卡片
+      switchTab('agents');
+      setTimeout(() => {
+        const card = document.getElementById('card-agent-' + agentName);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          card.classList.add('active-route');
+          setTimeout(() => card.classList.remove('active-route'), 2200);
+        }
+      }, 400);
+    } else if (resp.status === 409) {
+      toast('⚠️ Agent 已存在: ' + agentName, 'm');
+      nameInp.focus();
+      nameInp.style.borderColor = 'var(--ct)';
+      setTimeout(() => { nameInp.style.borderColor = ''; }, 1400);
+    } else {
+      toast('❌ 创建失败: ' + (data.error || '未知错误'), 'd');
+    }
+  } catch (e) {
+    toast('❌ 网络错误: ' + e.message, 'd');
+  } finally {
+    btn.classList.remove('saving');
+    btn.textContent = '✨ 创建 Agent';
+  }
+}
+
+/* ────────── Delete Agent Modal ────────── */
+function openDeleteAgentModal(agentId, agentName) {
+  document.getElementById('del-agent-name').textContent = agentName;
+  document.getElementById('del-agent-path').textContent = 'agents/' + agentId + '.md';
+  const modal = document.getElementById('delete-agent-modal');
+  modal.dataset.agentId = agentId;
+  modal.classList.add('open');
+}
+
+function closeDeleteAgentModal() {
+  document.getElementById('delete-agent-modal').classList.remove('open');
+}
+
+async function doDeleteAgent() {
+  const modal = document.getElementById('delete-agent-modal');
+  const agentId = modal.dataset.agentId;
+  if (!agentId) return;
+  const btn = document.getElementById('delete-agent-confirm-btn');
+  btn.classList.add('saving');
+  btn.textContent = '⏳ 删除中...';
+  try {
+    const resp = await fetch('/api/delete_agent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_id: agentId })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      toast('🗑️ Agent 已删除: agents/' + agentId + '.md', 'd');
+      closeDeleteAgentModal();
+    } else {
+      toast('❌ 删除失败: ' + (data.error || '未知错误'), 'd');
+    }
+  } catch (e) {
+    toast('❌ 网络错误: ' + e.message, 'd');
+  } finally {
+    btn.classList.remove('saving');
+    btn.textContent = '🗑️ 确认删除';
+  }
+}
+
+/* ────────── Delete Config Section ────────── */
+function _deleteConfigSection(idx) {
+  // Open confirmation modal instead of direct delete
+  if (!_modalAgentData || !_modalAgentData.sections) return;
+  const sec = _modalAgentData.sections[idx];
+  if (!sec) return;
+  _openDelSecModal(idx, sec.title);
+}
+
+function _openDelSecModal(idx, title) {
+  const modal = document.getElementById('del-sec-modal');
+  if (!modal) return;
+  document.getElementById('del-sec-name').textContent = title;
+  modal.dataset.secIdx = String(idx);
+  modal.classList.add('open');
+}
+
+function _closeDelSecModal() {
+  const modal = document.getElementById('del-sec-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function _doDelSec() {
+  const modal = document.getElementById('del-sec-modal');
+  if (!modal) return;
+  const idx = parseInt(modal.dataset.secIdx);
+  if (isNaN(idx) || !_modalAgentData || !_modalAgentData.sections) return;
+  const sec = _modalAgentData.sections[idx];
+  if (!sec) return;
+  const title = sec.title;
+  _modalAgentData.sections.splice(idx, 1);
+  delete _editSec[title];
+  // If this section was active, clear the editor pane
+  if (_navL1 === 'sec:' + idx) {
+    _navL1 = null; _navL2 = null;
+    const ed = document.getElementById('modal-editor');
+    if (ed) ed.innerHTML = '<div class="modal-hint"><div class="hint-ico">⬅</div><div class="hint-txt">从左侧选择配置项</div></div>';
+    _hideBc();
+    const l2 = document.getElementById('modal-l2list');
+    if (l2) { l2.innerHTML = ''; l2.style.display = 'none'; }
+    const bc = document.getElementById('modal-bc');
+    if (bc) bc.style.display = 'none';
+  }
+  _closeDelSecModal();
+  _buildL1Nav(_modalAgentData);
+  toast('已删除配置节: ' + title, 'm');
+}
+
+/* ────────── Add Config Modal ────────── */
+function _openAddConfigModal() {
+  const modal = document.getElementById('add-config-modal');
+  modal.classList.add('open');
+  const nameInp = document.getElementById('add-config-name');
+  if (nameInp) { nameInp.value = ''; }
+  _resetConfigFields();
+  setTimeout(() => { if (nameInp) nameInp.focus(); }, 60);
+}
+
+function _closeAddConfigModal() {
+  const modal = document.getElementById('add-config-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function _resetConfigFields() {
+  const container = document.getElementById('add-config-fields');
+  if (!container) return;
+  container.innerHTML = '';
+  _addConfigField();
+}
+
+function _addConfigField() {
+  const container = document.getElementById('add-config-fields');
+  if (!container) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:6px';
+  row.innerHTML =
+    '<input type="text" class="form-input cfg-field-key" placeholder="key" style="flex:0 0 130px;font-size:11px" />' +
+    '<span style="color:var(--tx-m);flex-shrink:0">:</span>' +
+    '<input type="text" class="form-input cfg-field-val" placeholder="value" style="flex:1;font-size:11px" />' +
+    '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--tx-m);cursor:pointer;font-size:14px;padding:2px 5px;border-radius:3px;flex-shrink:0;line-height:1;transition:.15s" onmouseover="this.style.color=\'var(--cr)\'" onmouseout="this.style.color=\'var(--tx-m)\'">✕</button>';
+  container.appendChild(row);
+  // Focus new key input
+  setTimeout(() => { const inp = row.querySelector('.cfg-field-key'); if (inp) inp.focus(); }, 30);
+}
+
+function _doAddConfig() {
+  const nameInp = document.getElementById('add-config-name');
+  const raw = (nameInp ? nameInp.value.trim() : '');
+  const name = raw.replace(/[^a-z0-9_\-]/gi, '_').toLowerCase();
+  if (!name) {
+    if (nameInp) {
+      nameInp.focus();
+      nameInp.style.borderColor = 'var(--cr)';
+      nameInp.style.boxShadow = '0 0 0 2px rgba(248,81,73,.18)';
+      setTimeout(() => { nameInp.style.borderColor = ''; nameInp.style.boxShadow = ''; }, 1400);
+    }
+    toast('请输入配置节名称', 'd');
+    return;
+  }
+  // Check duplicate
+  const existing = (_modalAgentData && _modalAgentData.sections || []).find(s => s.title === name);
+  if (existing) { toast('⚠️ 已存在同名配置节: ' + name, 'm'); return; }
+
+  // Collect key-value fields
+  const rows = document.querySelectorAll('#add-config-fields > div');
+  const pairs = [];
+  rows.forEach(row => {
+    const k = ((row.querySelector('.cfg-field-key') || {}).value || '').trim();
+    const v = ((row.querySelector('.cfg-field-val') || {}).value || '').trim();
+    if (k) pairs.push([k, v]);
+  });
+
+  // Build YAML content string
+  let yaml = name + ':\n';
+  if (pairs.length > 0) {
+    pairs.forEach(([k, v]) => { yaml += '  ' + k + ': ' + (v ? v : '""') + '\n'; });
+  } else {
+    yaml += '  # add your fields here\n';
+  }
+
+  // Add section to agent data
+  if (!_modalAgentData.sections) _modalAgentData.sections = [];
+  _modalAgentData.sections.push({ title: name, content_type: 'yaml', content: yaml, children: [] });
+  _editSec[name] = yaml;
+
+  // Refresh nav and select new section
+  _buildL1Nav(_modalAgentData);
+  const newIdx = _modalAgentData.sections.length - 1;
+  _selectL1('sec:' + newIdx);
+  _closeAddConfigModal();
+  toast('✅ 已添加配置节: ' + name, 'c');
+}
+
+// ESC 键关闭弹窗
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeAgentModal(); closeCreateAgentModal(); closeDeleteAgentModal(); _closeAddConfigModal(); _closeDelSecModal(); }
+});
+
+/* ────────── Init ────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  initSocket();
+  setTimeout(() => {
+    const el = document.getElementById('loading');
+    if (el && !el.classList.contains('out')) {
+      hideLd();
+      toast('服务器响应超时，请检查 server.py', 'd');
+    }
+  }, 8000);
+});
+</script>
+</body>
+</html>
