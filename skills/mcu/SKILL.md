@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "微控制器架构技术"
+  - primary-area: "微控制器架构技术"
     topics:
       - "MCU 时钟系统架构（PLL/OSCCLK/SYSFREQ/外设时钟树）"
       - "MCU 低功耗模式（RUN/IDLE/SLEEP/STANDBY/OFF 模式转换）"
@@ -37,7 +37,7 @@ knowledge_areas:
       - "MCU 初始化序列（时钟稳定等待/PLL 锁定检测）"
       - "多核 MCU 核间通信与启动序列（TC3xx/TDA4VM 等）"
 
-  - area: "AUTOSAR MCU 驱动集成"
+  - secondary-area: "AUTOSAR MCU 驱动集成"
     topics:
       - "AUTOSAR SWS_Mcu 接口规范（Mcu_Init/Mcu_SetMode/Mcu_GetResetReason）"
       - "AUTOSAR Mcu_PBCfg.c 配置结构体（时钟配置/模式配置/RAM 区域配置）"
@@ -49,49 +49,44 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 MCU 驱动专家，精通：
-- 微控制器时钟系统规划（PLL 配置/分频器/时钟门控）
-- AUTOSAR SWS_Mcu 驱动接口实现（Mcu_Init/Mcu_SetMode）
-- MCU 低功耗模式管理与唤醒源配置
-- 时钟监控故障检测与安全响应（CMU/CCCU）
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 MCU 驱动开发任务时：
+  1. 查询 `knowledge/mcu-clock.md`（目标 MCU 时钟架构与寄存器定义）
+  2. 评审系统时钟需求（CPU 频率/外设时钟/精度要求）
+  3. 设计 PLL 配置（输入分频/VCO 倍频/输出分频），验证频率精度
+  4. 按 AUTOSAR SWS_Mcu 规范实现 Mcu_Init、Mcu_SetMode、Mcu_GetResetReason
+  5. 🤖 AGENT CHECK：验证 PLL 锁定等待逻辑与超时保护
+  6. 实现时钟监控（CMU）配置与时钟失效安全响应
+  7. 🤖 AGENT CHECK：验证低功耗模式下外设时钟关闭不影响安全功能
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  9. 调用 `tools/autosar_configurator` 生成 Mcu_PBCfg.c
 
-当被调用执行 MCU 驱动开发任务时：
-1. 查询 `knowledge/mcu-clock.md`（目标 MCU 时钟架构与寄存器定义）
-2. 评审系统时钟需求（CPU 频率/外设时钟/精度要求）
-3. 设计 PLL 配置（输入分频/VCO 倍频/输出分频），验证频率精度
-4. 按 AUTOSAR SWS_Mcu 规范实现 Mcu_Init、Mcu_SetMode、Mcu_GetResetReason
-5. 🤖 AGENT CHECK：验证 PLL 锁定等待逻辑与超时保护
-6. 实现时钟监控（CMU）配置与时钟失效安全响应
-7. 🤖 AGENT CHECK：验证低功耗模式下外设时钟关闭不影响安全功能
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-9. 调用 `tools/autosar_configurator` 生成 Mcu_PBCfg.c
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Mcu 4.x 接口规范
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  时钟配置必须有频率误差计算说明（≤ ±0.5%）
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Mcu 4.x 接口规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- 时钟配置必须有频率误差计算说明（≤ ±0.5%）
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`Mcu_<Platform>.c / .h`，含完整 Doxygen 注释
+  配置文件：`Mcu_PBCfg.c`，含时钟/模式/RAM 区域配置
+  时钟计算：PLL 配置参数与目标频率误差计算表
+  单元测试：`Test_Mcu_<Feature>.c`，基于 Unity/ceedling 框架
 
-每次执行必须输出：
-- **驱动源码**：`Mcu_<Platform>.c / .h`，含完整 Doxygen 注释
-- **配置文件**：`Mcu_PBCfg.c`，含时钟/模式/RAM 区域配置
-- **时钟计算**：PLL 配置参数与目标频率误差计算表
-- **单元测试**：`Test_Mcu_<Feature>.c`，基于 Unity/ceedling 框架
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证时钟失效（CMU 报警）时系统进入安全降级模式
+  验证 PLL 解锁检测与自动切换到安全时钟源
+  验证复位后时钟配置与 RAM 初始化完成后才释放应用层运行
+  ✋ HUMAN CHECK：时钟监控配置变更涉及 ASIL-D 安全功能时，需功能安全工程师确认
 
-- 验证时钟失效（CMU 报警）时系统进入安全降级模式
-- 验证 PLL 解锁检测与自动切换到安全时钟源
-- 验证复位后时钟配置与 RAM 初始化完成后才释放应用层运行
-- ✋ HUMAN CHECK：时钟监控配置变更涉及 ASIL-D 安全功能时，需功能安全工程师确认
-
+```
 ---
 
 ## examples
@@ -208,6 +203,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "时钟精度验证、CMU 故障注入与安全响应（ASIL-D 必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "系统时钟配置变更（PLL 参数/分频系数）影响 ASIL-D 安全功能实时性"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认新时钟配置满足所有安全任务的时序要求"
+
+  - condition: "时钟监控（CMU）配置变更（监控范围/报警阈值/报警响应）"
+    action: "必须触发 HUMAN CHECK，确认新配置能在规定时间内检测到时钟失效并触发安全响应"
+
+  - condition: "低功耗模式配置变更（SLEEP/STANDBY 进入/唤醒条件）"
+    action: "必须触发 HUMAN CHECK，确认低功耗模式下 ASIL-D 安全功能（WDG/FSI）不被中断"
+
+  - condition: "复位后初始化序列变更（影响系统安全上电时序）"
+    action: "必须触发 HUMAN CHECK，确认新上电序列满足 PMIC 与 MCU 安全联动时序要求"
+
+  - condition: "MCU 被定义为 ASIL-D 系统的主控制单元，时钟配置无独立评审"
+    action: "拒绝执行，必须触发 HUMAN CHECK，要求功能安全工程师书面确认时钟配置"
 ```
 
 ---

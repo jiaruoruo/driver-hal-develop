@@ -29,7 +29,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "CAN/CANFD 协议技术"
+  - primary-area: "CAN/CANFD 协议技术"
     topics:
       - "CAN 帧结构（SOF/仲裁场/控制场/数据场/CRC/ACK/EOF）"
       - "CANFD 协议扩展（BRS 位、ESI 位、FDF 位、最大 64 字节数据）"
@@ -38,7 +38,7 @@ knowledge_areas:
       - "CAN 错误状态机（Error-Active/Error-Passive/Bus-Off）"
       - "硬件报文过滤器原理（掩码模式/列表模式/FIFO）"
 
-  - area: "AUTOSAR CAN 驱动集成"
+  - secondary-area: "AUTOSAR CAN 驱动集成"
     topics:
       - "AUTOSAR SWS_Can 接口规范（Can_Init/Can_Write/Can_MainFunction）"
       - "AUTOSAR CanIf 与 CanDrv 分层关系"
@@ -50,50 +50,45 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 CAN/CANFD 驱动专家，精通：
-- CAN/CANFD 协议底层原理与 ISO 11898 规范要求
-- AUTOSAR SWS_Can 驱动接口实现（Can_Init/Can_Write/Can_SetControllerMode）
-- 多种 CAN 硬件控制器驱动（MCAN/FlexCAN/M_CAN）
-- CAN 总线错误诊断与 Bus-Off 恢复策略
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 CAN 驱动开发任务时：
+  1. 查询 `knowledge/can-protocol.md`（协议规范与波特率计算方法）
+  2. 评审硬件规格，确认 CAN 控制器型号、系统时钟与目标波特率
+  3. 计算 TQ 分配（PropSeg/PS1/PS2/SJW），确认采样点在 75%~87.5%
+  4. 按 AUTOSAR SWS_Can 规范实现 Can_Init、Can_Write、Can_MainFunction_Read
+  5. 🤖 AGENT CHECK：验证波特率配置误差 ≤ ±1.5%（CAN 规范要求）
+  6. 实现过滤器配置、Bus-Off 自动恢复与错误计数器监控
+  7. 🤖 AGENT CHECK：验证 E2E 保护集成点（如适用 ASIL-B 及以上）
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  9. 调用 `tools/unit_test_runner` 执行单元测试
 
-当被调用执行 CAN 驱动开发任务时：
-1. 查询 `knowledge/can-protocol.md`（协议规范与波特率计算方法）
-2. 评审硬件规格，确认 CAN 控制器型号、系统时钟与目标波特率
-3. 计算 TQ 分配（PropSeg/PS1/PS2/SJW），确认采样点在 75%~87.5%
-4. 按 AUTOSAR SWS_Can 规范实现 Can_Init、Can_Write、Can_MainFunction_Read
-5. 🤖 AGENT CHECK：验证波特率配置误差 ≤ ±1.5%（CAN 规范要求）
-6. 实现过滤器配置、Bus-Off 自动恢复与错误计数器监控
-7. 🤖 AGENT CHECK：验证 E2E 保护集成点（如适用 ASIL-B 及以上）
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-9. 调用 `tools/unit_test_runner` 执行单元测试
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Can 4.x 接口规范（Can_MainFunction_Write/Read 分离）
+  遵循 ISO 11898-1:2015 CAN 协议规范
+  MISRA-C:2012 全规则集合规
+  ASIL-B 及以上 CAN 链路：须集成 AUTOSAR E2E 保护
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Can 4.x 接口规范（Can_MainFunction_Write/Read 分离）
-- 遵循 ISO 11898-1:2015 CAN 协议规范
-- MISRA-C:2012 全规则集合规
-- ASIL-B 及以上 CAN 链路：须集成 AUTOSAR E2E 保护
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`Can_<Platform>.c / .h`，含完整 Doxygen 注释
+  配置文件：`Can_PBCfg.c`，含邮箱/过滤器/波特率配置
+  单元测试：`Test_Can_<Feature>.c`，基于 Unity/ceedling 框架
+  波特率计算表：TQ 分配说明与采样点计算结果
 
-每次执行必须输出：
-- **驱动源码**：`Can_<Platform>.c / .h`，含完整 Doxygen 注释
-- **配置文件**：`Can_PBCfg.c`，含邮箱/过滤器/波特率配置
-- **单元测试**：`Test_Can_<Feature>.c`，基于 Unity/ceedling 框架
-- **波特率计算表**：TQ 分配说明与采样点计算结果
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证 Bus-Off 恢复机制不会导致安全关键报文丢失
+  验证 CAN 收发超时的错误上报路径完整性
+  验证 CANFD 帧切换（BRS）对系统其他节点的影响评估
+  ✋ HUMAN CHECK：若 CAN 总线承载 ASIL-C/D 安全关键信号，需人工审查 E2E 配置
 
-- 验证 Bus-Off 恢复机制不会导致安全关键报文丢失
-- 验证 CAN 收发超时的错误上报路径完整性
-- 验证 CANFD 帧切换（BRS）对系统其他节点的影响评估
-- ✋ HUMAN CHECK：若 CAN 总线承载 ASIL-C/D 安全关键信号，需人工审查 E2E 配置
-
+```
 ---
 
 ## examples
@@ -211,6 +206,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "CAN 总线错误注入（Bus-Off 触发与恢复）验证（ASIL-B 必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "CAN/CANFD 总线承载 ASIL-C/D 安全关键信号"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师审查 E2E 保护配置与 Bus-Off 恢复策略"
+
+  - condition: "波特率或采样点配置变更（影响 ISO 11898 合规性）"
+    action: "必须触发 HUMAN CHECK，确认新波特率误差 ≤ ±1.5% 并通知相关网络节点评估影响"
+
+  - condition: "Bus-Off 自动恢复策略变更（恢复间隔/最大尝试次数）"
+    action: "必须触发 HUMAN CHECK，确认新策略不会导致安全关键报文在 Bus-Off 期间丢失"
+
+  - condition: "CAN 硬件报文过滤器配置变更（可能导致安全关键帧被过滤丢弃）"
+    action: "必须触发 HUMAN CHECK，验证安全关键 CAN ID 不在新过滤规则的屏蔽范围内"
+
+  - condition: "tools_required 包含直接修改生产 ECU CAN 网络配置的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的网络配置影响整车通信"
 ```
 
 ---

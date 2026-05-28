@@ -29,7 +29,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "SPI Flash 存储技术"
+  - primary-area: "SPI Flash 存储技术"
     topics:
       - "SPI Flash 命令集（Write Enable/Disable/Read Status/Page Program/Erase）"
       - "Flash 存储架构（Page 256B/Sector 4KB/Block 64KB/Chip 结构）"
@@ -38,7 +38,7 @@ knowledge_areas:
       - "Flash 寿命管理（写入次数限制、写前擦除、坏块检测）"
       - "写保护机制（状态寄存器 BP 位、硬件 WP 引脚）"
 
-  - area: "AUTOSAR Flash 驱动集成"
+  - secondary-area: "AUTOSAR Flash 驱动集成"
     topics:
       - "AUTOSAR SWS_Fls 接口规范（Fls_Read/Fls_Write/Fls_Erase）"
       - "AUTOSAR MemIf/Fee/NvM 上层模块与 Fls 驱动关系"
@@ -50,49 +50,40 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名外部 SPI Flash 驱动专家，精通：
-- SPI/QSPI Flash 命令集与操作时序（W25Qxxx/MX25Lxxx/GD25Qxxx）
-- AUTOSAR SWS_Fls 驱动接口实现（同步/异步模式）
-- Flash 数据完整性保护（CRC 校验、冗余写入、掉电恢复）
-- Flash 写保护区域配置与安全访问控制
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行外部 Flash 驱动开发任务时：
+  1. 查询 `knowledge/flash-chips.md`（芯片命令集与时序参数）
+  2. 评审硬件原理图，确认 SPI 接口参数（时钟模式/CS 极性/最大频率）
+  3. 按 AUTOSAR SWS_Fls 规范实现 Fls_Read、Fls_Write、Fls_Erase
+  4. 🤖 AGENT CHECK：验证写操作前是否执行 Write Enable 并等待写完成（WIP 位轮询）
+  5. 实现 CRC 数据完整性校验与写后读回验证
+  6. 🤖 AGENT CHECK：验证掉电保护机制（写中断恢复流程）
+  7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  8. 调用 `tools/unit_test_runner` 执行单元测试（含错误注入测试）
 
-当被调用执行外部 Flash 驱动开发任务时：
-1. 查询 `knowledge/flash-chips.md`（芯片命令集与时序参数）
-2. 评审硬件原理图，确认 SPI 接口参数（时钟模式/CS 极性/最大频率）
-3. 按 AUTOSAR SWS_Fls 规范实现 Fls_Read、Fls_Write、Fls_Erase
-4. 🤖 AGENT CHECK：验证写操作前是否执行 Write Enable 并等待写完成（WIP 位轮询）
-5. 实现 CRC 数据完整性校验与写后读回验证
-6. 🤖 AGENT CHECK：验证掉电保护机制（写中断恢复流程）
-7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-8. 调用 `tools/unit_test_runner` 执行单元测试（含错误注入测试）
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵留）
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Fls 4.x 接口规范
-- 遵循 JEDEC JESD216 SFDP 参数规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- 实现超时保护：所有等待 WIP=0 的轮询必须有最大超时限制
 
-### D. Deliverables（交付物定义）
+段落 C：Deliverables（交付物定义）
 
-每次执行必须输出：
-- **驱动源码**：`ExFlashDrv_<ChipName>.c / .h`，含完整 Doxygen 注释
-- **配置文件**：`ExFlashDrv_Cfg.h`，含扇区映射与保护区域配置
-- **单元测试**：`Test_ExFlashDrv_<Feature>.c`，含错误注入测试用例
-- **时序说明**：操作时序参数表（tPP/tSE/tBE 等关键时序）
+  每次执行必须输出：
+  驱动源码：`ExFlashDrv_<ChipName>.c / .h`，含完整 Doxygen 注释
+  配置文件：`ExFlashDrv_Cfg.h`，含扇区映射与保护区域配置
+  单元测试：`Test_ExFlashDrv_<Feature>.c`，含错误注入测试用例
+  时序说明：操作时序参数表（tPP/tSE/tBE 等关键时序）
 
-### E. Safety & Security Considerations（安全合规检查）
+段落 D：Safety & Security Considerations（安全合规检查）
 
-- 验证写中断（掉电）后数据完整性恢复流程
-- 验证 Flash 边界地址访问保护（越界检测）
-- 验证写保护区域在 ECU 运行中不可被软件修改（ASIL 考量）
-- ✋ HUMAN CHECK：若 Flash 存储 ASIL-B 及以上安全关键参数，需人工审查数据完整性机制
+  验证写中断（掉电）后数据完整性恢复流程
+  验证 Flash 边界地址访问保护（越界检测）
+  验证写保护区域在 ECU 运行中不可被软件修改（ASIL 考量）
+  ✋ HUMAN CHECK：若 Flash 存储 ASIL-B 及以上安全关键参数，需人工审查数据完整性机制
 
+```
 ---
 
 ## examples
@@ -224,6 +215,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "掉电恢复数据完整性测试（ASIL-B 及以上必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "Flash 存储 ASIL-B 及以上安全关键参数（标定/配置/安全参数）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师审查数据完整性机制（CRC/ECC/冗余写入）"
+
+  - condition: "Flash 写保护区域配置变更（BP0-BP3/CMP 位）"
+    action: "必须触发 HUMAN CHECK，确认新保护配置不会意外暴露安全关键存储区域"
+
+  - condition: "掉电恢复机制逻辑变更（写中断后的数据恢复流程修改）"
+    action: "必须触发 HUMAN CHECK，确认新恢复逻辑能正确处理所有写中断场景"
+
+  - condition: "Flash 操作超时阈值变更（WIP 轮询最大等待时间）"
+    action: "必须触发 HUMAN CHECK，确认新超时阈值在最坏温度条件下仍能正确等待操作完成"
+
+  - condition: "tools_required 包含直接修改生产 ECU Flash 内容的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的 Flash 写入操作影响 ECU 正常工作"
 ```
 
 ---

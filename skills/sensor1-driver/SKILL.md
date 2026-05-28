@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "传感器技术"
+  - primary-area: "传感器技术"
     topics:
       - "模拟传感器特性（NTC/PT100 温度传感器、压阻式压力传感器）"
       - "ADC 采样原理（分辨率/参考电压/采样率/量化误差）"
@@ -37,7 +37,7 @@ knowledge_areas:
       - "传感器故障检测（断线检测：低于最小阈值；短路检测：高于最大阈值）"
       - "传感器标定方法（两点标定/多点标定/非线性补偿）"
 
-  - area: "AUTOSAR ADC 驱动集成"
+  - secondary-area: "AUTOSAR ADC 驱动集成"
     topics:
       - "AUTOSAR SWS_Adc 接口规范（Adc_StartGroupConversion/Adc_ReadGroup）"
       - "ADC 转换组配置（连续/单次/硬件触发模式）"
@@ -49,49 +49,44 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名传感器驱动专家，精通：
-- ADC 模拟传感器采集（多通道/DMA/中断模式）
-- SPI/I2C 数字传感器驱动框架（磁编码器/MEMS 传感器）
-- 信号处理算法（滑动平均/一阶低通滤波/中值滤波）
-- 传感器故障诊断（断线/短路/超量程）与标定参数管理
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行传感器驱动开发任务时：
+  1. 查询 `knowledge/sensor-types.md`（传感器类型与接口规范）
+  2. 评审传感器数据手册，确认量程/精度/接口时序参数
+  3. 按 AUTOSAR SWS_Adc 或 SWS_Spi 规范实现数据采集接口
+  4. 🤖 AGENT CHECK：验证 ADC 参考电压与传感器满量程电压匹配
+  5. 实现信号滤波算法（选择适合采样率和响应时间要求的算法）
+  6. 实现物理量转换（ADC 计数 → 工程单位）与标定参数应用
+  7. 🤖 AGENT CHECK：验证断线/短路检测阈值设置合理（防误判）
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  9. 调用 `tools/unit_test_runner` 执行单元测试
 
-当被调用执行传感器驱动开发任务时：
-1. 查询 `knowledge/sensor-types.md`（传感器类型与接口规范）
-2. 评审传感器数据手册，确认量程/精度/接口时序参数
-3. 按 AUTOSAR SWS_Adc 或 SWS_Spi 规范实现数据采集接口
-4. 🤖 AGENT CHECK：验证 ADC 参考电压与传感器满量程电压匹配
-5. 实现信号滤波算法（选择适合采样率和响应时间要求的算法）
-6. 实现物理量转换（ADC 计数 → 工程单位）与标定参数应用
-7. 🤖 AGENT CHECK：验证断线/短路检测阈值设置合理（防误判）
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-9. 调用 `tools/unit_test_runner` 执行单元测试
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Adc 4.x 接口规范
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  传感器滤波参数必须有理论依据说明（截止频率/时间常数）
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Adc 4.x 接口规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- 传感器滤波参数必须有理论依据说明（截止频率/时间常数）
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`SensorDrv_<SensorName>.c / .h`，含 Doxygen 注释
+  滤波算法：`SensorFilter_<Type>.c / .h`，含算法参数说明
+  标定模块：`SensorCalib.c / .h`，含参数结构体与 NVM 接口
+  单元测试：`Test_SensorDrv_<Feature>.c`，含故障注入测试用例
 
-每次执行必须输出：
-- **驱动源码**：`SensorDrv_<SensorName>.c / .h`，含 Doxygen 注释
-- **滤波算法**：`SensorFilter_<Type>.c / .h`，含算法参数说明
-- **标定模块**：`SensorCalib.c / .h`，含参数结构体与 NVM 接口
-- **单元测试**：`Test_SensorDrv_<Feature>.c`，含故障注入测试用例
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证安全关键传感器（制动/转向）具备双冗余或交叉校验
+  验证传感器故障检测时间满足 ASIL 响应时间要求
+  验证标定参数异常（越界/校验失败）时使用默认安全值
+  ✋ HUMAN CHECK：安全关键传感器（ASIL-B 及以上）故障检测逻辑变更需人工确认
 
-- 验证安全关键传感器（制动/转向）具备双冗余或交叉校验
-- 验证传感器故障检测时间满足 ASIL 响应时间要求
-- 验证标定参数异常（越界/校验失败）时使用默认安全值
-- ✋ HUMAN CHECK：安全关键传感器（ASIL-B 及以上）故障检测逻辑变更需人工确认
-
+```
 ---
 
 ## examples
@@ -210,6 +205,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "传感器精度验证、断线/短路故障注入（ASIL-B 必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "安全关键传感器（制动/转向/ASIL-B 及以上）故障检测逻辑变更"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认新检测逻辑满足 ASIL 故障检测时间要求"
+
+  - condition: "传感器断线/短路检测阈值变更（可能导致漏检或误报）"
+    action: "必须触发 HUMAN CHECK，确认新阈值在最坏工况（温度/电压波动）下仍能正确检测故障"
+
+  - condition: "标定参数存储格式或 CRC 校验策略变更"
+    action: "必须触发 HUMAN CHECK，确认变更后旧标定数据能被正确迁移，不引入测量偏差"
+
+  - condition: "传感器信号滤波参数变更（影响响应时间和噪声抑制）"
+    action: "必须触发 HUMAN CHECK，确认新滤波参数满足应用层对传感器响应时间的要求"
+
+  - condition: "tools_required 包含直接修改生产 ECU 传感器标定参数的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的标定数据写入导致测量错误"
 ```
 
 ---

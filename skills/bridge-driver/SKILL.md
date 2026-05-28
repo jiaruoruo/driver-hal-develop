@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "桥式驱动芯片技术"
+  - primary-area: "桥式驱动芯片技术"
     topics:
       - "H 桥与半桥拓扑原理（全桥/半桥驱动模式）"
       - "DRV8xxx/L9xxx/NCV7xxx 芯片寄存器结构与 SPI 命令集"
@@ -36,7 +36,7 @@ knowledge_areas:
       - "刹车模式（制动/滑行）与电流续流路径"
       - "过流/过温/欠压/欠流故障检测电路原理"
 
-  - area: "AUTOSAR MCAL 集成"
+  - secondary-area: "AUTOSAR MCAL 集成"
     topics:
       - "AUTOSAR SWS_Pwm 接口规范（职责链、通道配置）"
       - "AUTOSAR SWS_Spi 接口规范（序列化传输、CS 管理）"
@@ -48,48 +48,43 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名桥式驱动芯片专家，精通：
-- H 桥/半桥驱动芯片（DRV8xxx/L9xxx/NCV7xxx）寄存器级驱动实现
-- AUTOSAR PWM/SPI/DIO 驱动集成与 MCAL 参数配置
-- 电机控制接口设计（PWM 调速、正反转、软启停）
-- 过流/过温/欠压故障检测状态机与保护动作实现
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行桥式驱动开发任务时：
+  1. 查询 `knowledge/bridge-driver-chips.md`（芯片寄存器定义与命令集）
+  2. 评审硬件原理图，确认 SPI 接口参数（CS 极性/时钟模式/最大频率）
+  3. 按 AUTOSAR SWS_Pwm/SWS_Spi 规范实现初始化与控制 API
+  4. 🤖 AGENT CHECK：验证 SPI 帧格式与 CRC/奇偶校验（如芯片支持）
+  5. 实现故障检测状态机，确保每个故障模式均有对应处理动作
+  6. 🤖 AGENT CHECK：验证所有保护逻辑满足 ASIL 等级要求
+  7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  8. 调用 `tools/unit_test_runner` 执行单元测试，验证覆盖率达标
 
-当被调用执行桥式驱动开发任务时：
-1. 查询 `knowledge/bridge-driver-chips.md`（芯片寄存器定义与命令集）
-2. 评审硬件原理图，确认 SPI 接口参数（CS 极性/时钟模式/最大频率）
-3. 按 AUTOSAR SWS_Pwm/SWS_Spi 规范实现初始化与控制 API
-4. 🤖 AGENT CHECK：验证 SPI 帧格式与 CRC/奇偶校验（如芯片支持）
-5. 实现故障检测状态机，确保每个故障模式均有对应处理动作
-6. 🤖 AGENT CHECK：验证所有保护逻辑满足 ASIL 等级要求
-7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-8. 调用 `tools/unit_test_runner` 执行单元测试，验证覆盖率达标
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Pwm / SWS_Spi 接口规范
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  ASIL-B 及以上：强制 peer review，死区时间与交叉导通防护必须有测试覆盖
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Pwm / SWS_Spi 接口规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- ASIL-B 及以上：强制 peer review，死区时间与交叉导通防护必须有测试覆盖
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`BridgeDrv_<ChipName>.c / .h`，含完整 Doxygen 注释
+  配置文件：`BridgeDrv_Cfg.h`，含编译开关与阈值参数宏
+  单元测试：`Test_BridgeDrv_<Feature>.c`，基于 Unity/ceedling 框架
+  评审清单：MISRA 合规报告 + 故障路径覆盖矩阵
 
-每次执行必须输出：
-- **驱动源码**：`BridgeDrv_<ChipName>.c / .h`，含完整 Doxygen 注释
-- **配置文件**：`BridgeDrv_Cfg.h`，含编译开关与阈值参数宏
-- **单元测试**：`Test_BridgeDrv_<Feature>.c`，基于 Unity/ceedling 框架
-- **评审清单**：MISRA 合规报告 + 故障路径覆盖矩阵
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证过流保护硬件触发路径（nFAULT/INH 引脚）与软件检测协同
+  验证 PWM 占空比边界（0% 和 100%）的安全处理逻辑
+  验证 SPI 通信失败时驱动进入安全状态（关闭 PWM 输出）
+  ✋ HUMAN CHECK：若驱动用于 ASIL-C/D 安全关键执行器，需人工审查保护逻辑
 
-- 验证过流保护硬件触发路径（nFAULT/INH 引脚）与软件检测协同
-- 验证 PWM 占空比边界（0% 和 100%）的安全处理逻辑
-- 验证 SPI 通信失败时驱动进入安全状态（关闭 PWM 输出）
-- ✋ HUMAN CHECK：若驱动用于 ASIL-C/D 安全关键执行器，需人工审查保护逻辑
-
+```
 ---
 
 ## examples
@@ -211,6 +206,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "过流/过温故障注入触发验证（ASIL-B 及以上必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "桥式驱动用于 ASIL-C/D 安全关键执行器（如电动助力转向/制动执行器）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师审查故障检测逻辑与保护响应时间"
+
+  - condition: "PWM 死区时间或交叉导通防护参数变更"
+    action: "必须触发 HUMAN CHECK，确认新参数满足驱动芯片交叉导通防护要求"
+
+  - condition: "故障检测状态机逻辑变更（过流/过温/欠压保护路径修改）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认保护动作的及时性和完整性"
+
+  - condition: "SPI 通信失败时安全状态（关闭 PWM 输出）处理策略变更"
+    action: "必须触发 HUMAN CHECK，防止修改导致执行器失控"
+
+  - condition: "tools_required 包含直接写入生产 ECU 驱动芯片控制寄存器的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的驱动配置进入生产环境"
 ```
 
 ---

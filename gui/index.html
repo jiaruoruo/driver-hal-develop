@@ -877,6 +877,70 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
 }
 .modal-btn-danger:hover{ filter:brightness(1.15) }
 .modal-btn-danger.saving{ opacity:.55;cursor:not-allowed }
+
+/* ── Card Zoom / Expand ─────────────────────────────────────── */
+.ccard-zoom-btn{
+  cursor:pointer;opacity:0;font-size:10px;padding:2px 5px;
+  background:rgba(56,139,253,.12);border:1px solid rgba(56,139,253,.3);
+  border-radius:5px;color:var(--ca);transition:.15s;flex-shrink:0;line-height:1.5
+}
+.ccard:hover .ccard-zoom-btn{ opacity:0.65 }
+.ccard-zoom-btn:hover{ opacity:1 !important; background:rgba(56,139,253,.22) !important }
+.ccard.ccard-expanded .ccard-zoom-btn{ opacity:0.9 !important }
+.ccard.ccard-expanded{
+  grid-column:span 2;
+  grid-row:span 2;
+  z-index:2;
+}
+.ccard.ccard-expanded .ccard-role{
+  -webkit-line-clamp:unset;
+  display:block;
+  overflow:visible;
+  max-height:none;
+}
+.ccard-extra{ display:none; margin-top:8px; border-top:1px solid var(--border); padding-top:8px }
+.ccard.ccard-expanded .ccard-extra{ display:block }
+.ccard-extra-item{
+  display:flex;align-items:flex-start;gap:6px;
+  font-size:10px;color:var(--tx-s);margin-bottom:5px;line-height:1.5
+}
+.ccard-extra-label{
+  font-size:9px;font-weight:700;color:var(--tx-m);min-width:44px;flex-shrink:0;padding-top:1px
+}
+
+/* ── Modal Resize & Maximize ────────────────────────────────── */
+.modal-box{ position:relative; display:flex; flex-direction:column }
+.modal-mid{ flex:1; min-height:0 }
+.modal-box.modal-maximized{
+  width:95vw !important; max-width:95vw !important;
+  height:90vh !important; max-height:90vh !important;
+}
+.modal-box.modal-maximized .modal-mid{ overflow:hidden }
+
+/* 右下角拖动调整手柄 */
+.modal-resize-handle{
+  position:absolute; right:0; bottom:0;
+  width:20px; height:20px; cursor:se-resize; z-index:200;
+  border-radius:0 0 var(--r) 0;
+  background:
+    linear-gradient(135deg,transparent 50%,var(--border) 50%,var(--border) 53%,transparent 53%),
+    linear-gradient(135deg,transparent 60%,var(--border) 60%,var(--border) 63%,transparent 63%),
+    linear-gradient(135deg,transparent 70%,var(--border) 70%,var(--border) 73%,transparent 73%);
+  opacity:.5; transition:opacity .15s
+}
+.modal-box:hover .modal-resize-handle{ opacity:.85 }
+.modal-resize-handle:hover{ opacity:1 !important }
+
+/* 放大/还原按钮 */
+.modal-maximize-btn{
+  cursor:pointer;background:none;
+  border:1px solid var(--border);border-radius:5px;
+  color:var(--tx-s);font-size:12px;padding:1px 7px;line-height:1.6;
+  transition:.15s;flex-shrink:0;margin-right:4px
+}
+.modal-maximize-btn:hover{
+  border-color:var(--ca);color:var(--ca);background:rgba(56,139,253,.08)
+}
 </style>
 </head>
 <body>
@@ -977,6 +1041,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
     <div class="modal-hdr">
       <span class="modal-hdr-icon">🤖</span>
       <span id="modal-title">Agent 配置</span>
+      <button class="modal-maximize-btn" id="agent-modal-max-btn" onclick="toggleModalMaximize('agent-modal')" title="最大化">⛶</button>
       <button class="modal-close" onclick="closeAgentModal()" title="关闭 (ESC)">✕</button>
     </div>
     <input type="hidden" id="modal-agent-id">
@@ -995,6 +1060,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
       <button class="modal-btn-cancel" onclick="closeAgentModal()">取消</button>
       <button class="modal-btn-save" id="modal-save-btn" onclick="saveAgentConfig()">💾 保存到文件</button>
     </div>
+    <div class="modal-resize-handle" onmousedown="initModalResize(event,'agent-modal')" title="拖动调整大小"></div>
   </div>
 </div>
 
@@ -1109,6 +1175,90 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
   </div>
 </div>
 
+<!-- Skill Config Modal -->
+<div id="skill-modal" class="modal-overlay" onclick="if(event.target===this)closeSkillModal()">
+  <div class="modal-box modal-wide">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">⚙️</span>
+      <span id="skill-modal-title">Skill 配置</span>
+      <button class="modal-maximize-btn" id="skill-modal-max-btn" onclick="toggleModalMaximize('skill-modal')" title="最大化">⛶</button>
+      <button class="modal-close" onclick="closeSkillModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <input type="hidden" id="skill-modal-id">
+    <div class="modal-mid">
+      <nav id="skill-l1nav" class="modal-l1nav"></nav>
+      <div class="modal-rpane">
+        <div id="skill-modal-editor" class="modal-editor">
+          <div class="modal-hint"><div class="hint-ico">⬅</div><div class="hint-txt">从左侧选择配置项</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">💡 保存后立即写入 skills/*/SKILL.md 并实时同步</span>
+      <button class="modal-btn-cancel" onclick="closeSkillModal()">取消</button>
+      <button class="modal-btn-save" id="skill-save-btn" onclick="saveSkillConfig()">💾 保存到文件</button>
+    </div>
+    <div class="modal-resize-handle" onmousedown="initModalResize(event,'skill-modal')" title="拖动调整大小"></div>
+  </div>
+</div>
+
+<!-- Create Skill Modal -->
+<div id="create-skill-modal" class="modal-overlay" onclick="if(event.target===this)closeCreateSkillModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">✨</span>
+      <span style="font-size:14px;font-weight:700;color:var(--tx-p);flex:1">创建新 Skill</span>
+      <button class="modal-close" onclick="closeCreateSkillModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <label class="form-label">Skill 名称 <span class="form-hint">（英文，将作为目录名）</span></label>
+        <input id="create-skill-name" class="form-input" type="text"
+          placeholder="例如：can-fd、lin-bus、i2c-sensor"
+          autocomplete="off"
+          onkeydown="if(event.key==='Enter')doCreateSkill()" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Category</label>
+        <input id="create-skill-category" class="form-input" type="text"
+          placeholder="communication-driver / mcal-driver / safety" value="communication-driver" />
+      </div>
+      <div class="create-form-tip">
+        💡 将创建 <code>skills/&lt;名称&gt;/SKILL.md</code> 文件，包含完整的技能模板结构（knowledge_areas / implementation_guide 等），所有配置项为默认占位值，创建后可在 <b style="color:var(--tx-p)">✏️ 配置</b> 面板中逐项修改。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">创建后可立即点击卡片上的 ✏️ 配置 进行编辑</span>
+      <button class="modal-btn-cancel" onclick="closeCreateSkillModal()">取消</button>
+      <button class="modal-btn-save" id="create-skill-btn" onclick="doCreateSkill()">✨ 创建 Skill</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Skill Modal -->
+<div id="delete-skill-modal" class="modal-overlay" onclick="if(event.target===this)closeDeleteSkillModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-hdr-icon">🗑️</span>
+      <span style="font-size:14px;font-weight:700;color:var(--cr);flex:1">删除 Skill</span>
+      <button class="modal-close" onclick="closeDeleteSkillModal()" title="关闭 (ESC)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:10px;font-size:13px;color:var(--tx-s)">确认要删除 Skill：</div>
+      <div id="del-skill-name" class="del-confirm-name">skill-name</div>
+      <div class="del-confirm-tip" style="margin-top:10px">
+        ⚠️ 此操作将永久删除 <code id="del-skill-path">skills/xxx/SKILL.md</code> 目录，<b style="color:var(--cr)">无法撤销</b>。<br>
+        删除后该 Skill 将从路由系统中移除，所有引用该技能的 Agent 将失去此能力。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-footer-hint">删除前请确认无 Agent 强依赖此 Skill</span>
+      <button class="modal-btn-cancel" onclick="closeDeleteSkillModal()">取消</button>
+      <button class="modal-btn-danger" id="delete-skill-confirm-btn" onclick="doDeleteSkill()">🗑️ 确认删除</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toasts -->
 <div id="toasts"></div>
 
@@ -1121,6 +1271,18 @@ let currentTab = 'agents';
 let activeAgentIds = new Set();
 let activeSkillIds = new Set();
 let activeRuleIds  = new Set();
+
+// ── Skill Modal State ──
+let _modalSkillData = null;
+let _editSkillFM    = {};
+let _editSkillSec   = {};
+let _navSkillL1     = null;
+let _knAreaData     = [];   // [{type:'primary-area'|'secondary-area', name:string, topics:string[]}]
+let _knAreaSecTitle = '';   // 当前 knowledge_areas section 的 title
+let _ssData         = [];   // 统一结构化 section 数据
+let _ssTitle        = '';   // 当前 section title
+let _ssCfg          = null; // 当前 section 配置
+let _instrNewChildren = {}; // instructions 新增子节 { "instructions": ["title1",...] }
 
 /* ────────── Socket ────────── */
 function initSocket() {
@@ -1194,10 +1356,16 @@ function renderAgents(agents) {
     const st    = _getAgentSt(a.id);
     const stCss = _AGENT_ST_CSS[st];
     const stLbl = _AGENT_ST_LBL[st];
+    const _aExtra = [
+      a.expertise&&a.expertise.length ? `<div class="ccard-extra-item"><span class="ccard-extra-label">专长</span><span>${a.expertise.slice(0,4).map(escHtml).join(' · ')}</span></div>` : '',
+      a.skills&&a.skills.length ? `<div class="ccard-extra-item"><span class="ccard-extra-label">Skills</span><span>${a.skills.slice(0,5).map(escHtml).join(', ')}</span></div>` : '',
+      a.standards&&a.standards.length ? `<div class="ccard-extra-item"><span class="ccard-extra-label">标准</span><span>${a.standards.slice(0,3).map(escHtml).join(' / ')}</span></div>` : '',
+    ].filter(Boolean).join('');
     return `<div class="ccard ${isActive?'active-route':''}" id="card-agent-${a.id}">
       <div class="ccard-head">
         <span class="ccard-icon">🤖</span>
         <span class="ccard-name" title="${escHtml(a.name)}">${escHtml(a.name)}</span>
+        <span class="ccard-zoom-btn" title="放大卡片" onclick="event.stopPropagation();toggleCardZoom('card-agent-${a.id}')">⤢</span>
       </div>
       <div class="ccard-actions">
         <span class="ccard-status ${stCss}">${stLbl}</span>
@@ -1206,6 +1374,7 @@ function renderAgents(agents) {
       </div>
       <div class="ccard-role">${escHtml(a.role||a.description||'暂无描述')}</div>
       <div class="ccard-path">${a.path}</div>
+      ${_aExtra ? `<div class="ccard-extra">${_aExtra}</div>` : ''}
     </div>`;
   }).join('');
   const newCard = `<div class="ccard-new" onclick="openCreateAgentModal()" title="点击创建新 Agent">
@@ -1218,23 +1387,40 @@ function renderAgents(agents) {
 
 function renderSkills(skills) {
   const el = document.getElementById('cards-skills');
-  el.innerHTML = skills.map(s => {
+  const skillCards = skills.map(s => {
     const isActive = activeSkillIds.has(s.id);
     const cat = s.category || '';
     const catClass = cat.includes('comm') ? 'cat-comm' : cat.includes('mcal') ? 'cat-mcal' : 'cat-safe';
     const catLabel = cat.replace('-driver','').toUpperCase();
     const desc = s.description ? s.description.replace(/\n/g,' ').substring(0,80) : '';
+    const _fullDesc = s.description ? s.description.replace(/\n/g,' ') : '';
+    const _sExtra = [
+      _fullDesc.length > 80 ? `<div class="ccard-extra-item"><span class="ccard-extra-label">详情</span><span>${escHtml(_fullDesc)}</span></div>` : '',
+      s.category ? `<div class="ccard-extra-item"><span class="ccard-extra-label">分类</span><span>${escHtml(s.category)}</span></div>` : '',
+    ].filter(Boolean).join('');
     return `<div class="ccard ${isActive?'active-route':''}" id="card-skill-${s.id}">
       ${catLabel ? `<div class="ccard-cat ${catClass}">${catLabel}</div>` : ''}
       <div class="ccard-head">
         <span class="ccard-icon">⚙️</span>
-        <span class="ccard-name">${s.name}</span>
-        <span class="ccard-status st-active">active</span>
+        <span class="ccard-name" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+        <span class="ccard-zoom-btn" title="放大卡片" onclick="event.stopPropagation();toggleCardZoom('card-skill-${s.id}')">⤢</span>
       </div>
-      <div class="ccard-role">${desc||'通信/MCAL 驱动技能'}</div>
-      <div class="ccard-path">${s.path}</div>
+      <div class="ccard-actions">
+        <span class="ccard-status st-active">⚡ 已激活</span>
+        <span class="ccard-edit-hint" title="点击编辑配置" style="cursor:pointer;opacity:0.75;font-size:10px;padding:2px 7px;background:var(--bg-card2);border:1px solid var(--border);border-radius:5px;white-space:nowrap" onclick="event.stopPropagation();openSkillConfig('${s.id}')">✏️ 配置</span>
+        <span class="ccard-del-btn" title="删除此 Skill" onclick="event.stopPropagation();openDeleteSkillModal('${s.id}','${escHtml(s.name)}')">🗑️ 删除</span>
+      </div>
+      <div class="ccard-role">${escHtml(desc||'通信/MCAL 驱动技能')}</div>
+      <div class="ccard-path">${escHtml(s.path)}</div>
+      ${_sExtra ? `<div class="ccard-extra">${_sExtra}</div>` : ''}
     </div>`;
   }).join('');
+  const newCard = `<div class="ccard-new" onclick="openCreateSkillModal()" title="点击创建新 Skill">
+    <div class="ccard-new-icon">➕</div>
+    <div class="ccard-new-lbl">New Skill</div>
+    <div class="ccard-new-sub">点击创建新 Skill</div>
+  </div>`;
+  el.innerHTML = skillCards + newCard;
 }
 
 function renderRules(rules) {
@@ -1310,6 +1496,81 @@ function toolDesc(id) {
     'create-skill':'创建新 Skill 脚本',
   };
   return m[id] || '开发辅助工具';
+}
+
+/* ────────── Card Zoom / Expand ────────── */
+function toggleCardZoom(cardId) {
+  const el = document.getElementById(cardId);
+  if (!el) return;
+  const expanded = el.classList.toggle('ccard-expanded');
+  const btn = el.querySelector('.ccard-zoom-btn');
+  if (btn) {
+    btn.textContent = expanded ? '⤡' : '⤢';
+    btn.title = expanded ? '缩小卡片' : '放大卡片';
+  }
+}
+
+/* ────────── Modal Maximize / Resize ────────── */
+function toggleModalMaximize(overlayId) {
+  const overlay = document.getElementById(overlayId);
+  if (!overlay) return;
+  const box = overlay.querySelector('.modal-box');
+  if (!box) return;
+  const maxed = box.classList.toggle('modal-maximized');
+  // 同步更新按钮图标与提示
+  const btnId = overlayId === 'agent-modal' ? 'agent-modal-max-btn' : 'skill-modal-max-btn';
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.textContent = maxed ? '⊡' : '⛶';
+    btn.title = maxed ? '还原大小' : '最大化';
+  }
+  // 最大化时清除手动拖动设置的尺寸；还原时也清除
+  if (!maxed) {
+    box.style.width = '';
+    box.style.maxWidth = '';
+    box.style.height = '';
+    box.style.maxHeight = '';
+  }
+}
+
+function initModalResize(e, overlayId) {
+  e.preventDefault();
+  e.stopPropagation();
+  const overlay = document.getElementById(overlayId);
+  const box = overlay && overlay.querySelector('.modal-box');
+  if (!box) return;
+  // 如果当前是最大化状态，先取消最大化
+  if (box.classList.contains('modal-maximized')) {
+    box.classList.remove('modal-maximized');
+    const btnId = overlayId === 'agent-modal' ? 'agent-modal-max-btn' : 'skill-modal-max-btn';
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.textContent = '⛶'; btn.title = '最大化'; }
+  }
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startW = box.offsetWidth;
+  const startH = box.offsetHeight;
+  const minW = 520, minH = 420;
+  function onMove(e2) {
+    const newW = Math.max(minW, startW + (e2.clientX - startX));
+    const newH = Math.max(minH, startH + (e2.clientY - startY));
+    const maxW = window.innerWidth  * 0.97;
+    const maxH = window.innerHeight * 0.96;
+    box.style.width    = Math.min(newW, maxW) + 'px';
+    box.style.maxWidth = Math.min(newW, maxW) + 'px';
+    box.style.height    = Math.min(newH, maxH) + 'px';
+    box.style.maxHeight = Math.min(newH, maxH) + 'px';
+  }
+  function onUp() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+  document.body.style.userSelect = 'none';
+  document.body.style.cursor = 'se-resize';
 }
 
 /* ────────── Send Route (from input box) ────────── */
@@ -1780,7 +2041,6 @@ function _renderSecEditor(sec) {
   const tagLbl  = sec.content_type === 'yaml' ? '' : 'Markdown';
   el.innerHTML = `
     <div class="editor-hdr">
-      <span class="editor-level">##</span>
       <span class="editor-ttl">${escHtml(sec.title)}</span>
       <span class="editor-tag ${tagCls}">${tagLbl}</span>
     </div>
@@ -1796,7 +2056,6 @@ function _renderChildEditor(child) {
   const content = _editSec[child.title] !== undefined ? _editSec[child.title] : (child.content || '');
   el.innerHTML = `
     <div class="editor-hdr">
-      <span class="editor-level">###</span>
       <span class="editor-ttl">${escHtml(child.title)}</span>
       <span class="editor-tag csec-tag-md">Markdown</span>
     </div>
@@ -1922,7 +2181,6 @@ function _rebuildWfEditor() {
   const toolbar = document.createElement('div');
   toolbar.className = 'editor-hdr';
   toolbar.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">workflows</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>' +
     '<div style="flex:1"></div>' +
@@ -2286,7 +2544,6 @@ function _rebuildSkillsEditor() {
   const toolbar = document.createElement('div');
   toolbar.className = 'editor-hdr';
   toolbar.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">skills</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>' +
     `<span style="margin-left:auto;font-size:10px;color:var(--tx-m)">${_skillsData.length} 个已关联</span>`;
@@ -2337,7 +2594,9 @@ function _buildSkillRow(sk, idx) {
   const name = document.createElement('span');
   name.className = 'skill-name';
   name.title = sk.skill || '';
-  name.textContent = sk.skill || '';
+  // 如果值是路径格式 (skills/xxx/SKILL.md), 提取目录名显示
+  const _dn = (sk.skill || '').replace(/\/SKILL\.md$/i, '').split('/').pop();
+  name.textContent = _dn || sk.skill || '';
 
   /* Proficiency 下拉 */
   const profSel = document.createElement('select');
@@ -2378,10 +2637,12 @@ function _toggleSkillsDrop(container) {
   const existing = document.getElementById('skills-dropdown');
   if (existing) { existing.remove(); return; }
 
-  /* 可选 Skills = 项目所有 skills - 已添加的 */
-  const addedIds = new Set(_skillsData.map(s => s.skill));
-  const available = (projectData?.skills || [])
-    .filter(s => !addedIds.has(s.id));
+  /* 可选 Skills = 所有 SKILL.md 路径 - 已添加的 */
+  const addedPaths = new Set(_skillsData.map(s => s.skill));
+  const _allSkPaths = (_availSkillPaths && _availSkillPaths.length)
+    ? _availSkillPaths
+    : (projectData?.skills || []).map(s => s.path ? (s.path + '/SKILL.md') : ('skills/' + s.id + '/SKILL.md'));
+  const available = _allSkPaths.filter(p => !addedPaths.has(p));
 
   const drop = document.createElement('div');
   drop.className = 'skills-dropdown';
@@ -2405,14 +2666,15 @@ function _toggleSkillsDrop(container) {
       listEl.innerHTML = '<div class="skills-drop-empty">所有可用 Skill 已添加完毕</div>';
       return;
     }
-    items.forEach(s => {
+    items.forEach(skillPath => {
       const item = document.createElement('div');
       item.className = 'skills-drop-item';
+      const _shortN = skillPath.replace(/\/SKILL\.md$/i,'').split('/').pop() || skillPath;
       item.innerHTML =
         '<span style="font-size:13px;flex-shrink:0">⚙️</span>' +
-        `<span style="flex:1;font-weight:700">${escHtml(s.id)}</span>` +
-        `<span style="color:var(--tx-m);font-size:10px;white-space:nowrap">${escHtml((s.name||s.id).replace(s.id,'').trim()||'')}</span>`;
-      item.addEventListener('click', () => _addSkill(s.id));
+        `<span style="flex:1;font-size:11px;font-family:monospace">${escHtml(skillPath)}</span>` +
+        `<span style="color:var(--ct);font-size:10px;font-weight:700;white-space:nowrap">${escHtml(_shortN)}</span>`;
+      item.addEventListener('click', () => _addSkill(skillPath));
       listEl.appendChild(item);
     });
   };
@@ -2420,9 +2682,7 @@ function _toggleSkillsDrop(container) {
   renderItems(available);
   search.addEventListener('input', () => {
     const q = search.value.toLowerCase();
-    renderItems(available.filter(s =>
-      s.id.toLowerCase().includes(q) || (s.name||'').toLowerCase().includes(q)
-    ));
+    renderItems(available.filter(p => p.toLowerCase().includes(q)));
   });
 
   container.appendChild(drop);
@@ -2516,7 +2776,6 @@ function _rebuildRulesEditor() {
   const toolbar = document.createElement('div');
   toolbar.className = 'editor-hdr';
   toolbar.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">rules</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>' +
     `<span style="margin-left:auto;font-size:10px;color:var(--tx-m)">${_rulesData.length} 条规范</span>`;
@@ -2814,7 +3073,6 @@ function _rebuildToolsEditor() {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'editor-hdr';
   hdrDiv.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">tools</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>';
 
@@ -3105,7 +3363,6 @@ function _rebuildKnowledgeEditor() {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'editor-hdr';
   hdrDiv.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">' + _knSecTitle + '</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>';
 
@@ -3414,7 +3671,6 @@ function _rebuildMacEditor() {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'editor-hdr';
   hdrDiv.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">multi-agent-collaboration</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>';
 
@@ -3647,7 +3903,6 @@ function _rebuildHcEditor() {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'editor-hdr';
   hdrDiv.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">human_checks</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>';
 
@@ -3853,7 +4108,6 @@ function _rebuildOfEditor() {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'editor-hdr';
   hdrDiv.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">output_formats</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>';
 
@@ -4065,7 +4319,6 @@ function _rebuildPmEditor() {
   const hdrDiv = document.createElement('div');
   hdrDiv.className = 'editor-hdr';
   hdrDiv.innerHTML =
-    '<span class="editor-level">##</span>' +
     '<span class="editor-ttl">performance_metrics</span>' +
     '<span class="editor-tag csec-tag-yaml"></span>';
 
@@ -4464,8 +4717,1059 @@ function _doAddConfig() {
 
 // ESC 键关闭弹窗
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeAgentModal(); closeCreateAgentModal(); closeDeleteAgentModal(); _closeAddConfigModal(); _closeDelSecModal(); }
+  if (e.key === 'Escape') { closeAgentModal(); closeCreateAgentModal(); closeDeleteAgentModal(); _closeAddConfigModal(); _closeDelSecModal(); closeSkillModal(); closeCreateSkillModal(); closeDeleteSkillModal(); }
 });
+
+/* ══════════════════════════════════════════════════════════════
+   SKILL CONFIG MODAL
+   ══════════════════════════════════════════════════════════════ */
+
+async function openSkillConfig(skillId) {
+  try {
+    const resp = await fetch('/api/skill_config/' + skillId);
+    const data = await resp.json();
+    if (!resp.ok) { toast('加载 Skill 配置失败: ' + (data.error || ''), 'd'); return; }
+    _modalSkillData = data;
+    const fm = data.frontmatter || {};
+    _editSkillFM = {
+      version:               fm.version || '',
+      category:              fm.category || '',
+      subcategory:           fm.subcategory || '',
+      domain:                fm.domain || '',
+      description:           fm.description || '',
+      use_cases:             (fm.use_cases || []).join('\n'),
+      automotive_standards:  (fm.automotive_standards || []).join('\n'),
+    };
+    _editSkillSec = {};
+    (data.sections || []).forEach(s => {
+      _editSkillSec[s.title] = s.content || '';
+      (s.children || []).forEach(c => { _editSkillSec[c.title] = c.content || ''; });
+    });
+    _navSkillL1 = null;
+    _buildSkillL1Nav(data);
+    document.getElementById('skill-modal-title').textContent = fm.name || skillId;
+    document.getElementById('skill-modal-id').value = skillId;
+    document.getElementById('skill-modal').classList.add('open');
+    setTimeout(() => _selectSkillL1('fm'), 80);
+  } catch(e) { toast('网络错误: ' + e.message, 'd'); }
+}
+
+function closeSkillModal() {
+  document.getElementById('skill-modal').classList.remove('open');
+  _modalSkillData = null; _editSkillFM = {}; _editSkillSec = {}; _navSkillL1 = null;
+  _instrNewChildren = {};
+}
+
+function _buildSkillL1Nav(data) {
+  const nav = document.getElementById('skill-l1nav');
+  nav.innerHTML = '';
+  const grp = document.createElement('div');
+  grp.className = 'l1nav-grp-lbl'; grp.textContent = 'Config List';
+  nav.appendChild(grp);
+  // Frontmatter item
+  const fmEl = document.createElement('div');
+  fmEl.className = 'l1nav-item'; fmEl.dataset.key = 'fm';
+  fmEl.innerHTML = '<span class="l1nav-icon">📋</span><span class="l1nav-lbl">基本信息</span><span class="l1nav-badge csec-tag-yaml">FM</span>';
+  fmEl.addEventListener('click', () => _selectSkillL1('fm'));
+  nav.appendChild(fmEl);
+  const sep = document.createElement('div'); sep.className = 'l1nav-sep'; nav.appendChild(sep);
+  // Sections
+  (data.sections || []).forEach((sec, i) => {
+    const el = document.createElement('div');
+    el.className = 'l1nav-item'; el.dataset.key = 'sec:' + i;
+    const icon = sec.content_type === 'yaml' ? '🔧' : '📝';
+    el.innerHTML = `<span class="l1nav-icon">${icon}</span><span class="l1nav-lbl" title="${escHtml(sec.title)}">${escHtml(sec.title)}</span>`;
+    el.addEventListener('click', () => _selectSkillL1('sec:' + i));
+    nav.appendChild(el);
+  });
+}
+
+function _selectSkillL1(key) {
+  _navSkillL1 = key;
+  document.querySelectorAll('#skill-l1nav .l1nav-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.key === key));
+  if (key === 'fm') {
+    _renderSkillFMEditor();
+  } else {
+    const idx = parseInt(key.split(':')[1]);
+    const sec = (_modalSkillData.sections || [])[idx];
+    if (!sec) return;
+    if (_isKnAreaSec(sec)) { _renderKnAreaEditor(sec); return; }
+    if (_isInstrSec(sec))  { _renderInstrEditor(sec);  return; }
+    const _ssCfgHit = _getSSCfg(sec);
+    if (_ssCfgHit) { _renderSSEditor(sec, _ssCfgHit); return; }
+    const content = _editSkillSec[sec.title] !== undefined ? _editSkillSec[sec.title] : (sec.content || '');
+    const tagCls = sec.content_type === 'yaml' ? 'csec-tag-yaml' : 'csec-tag-md';
+    const ed = document.getElementById('skill-modal-editor');
+    ed.innerHTML = `<div class="editor-hdr">
+      <span class="editor-ttl">${escHtml(sec.title)}</span>
+      <span class="editor-tag ${tagCls}">${sec.content_type === 'yaml' ? '' : 'Markdown'}</span>
+    </div>
+    <textarea class="form-textarea" id="skill-sec-ta" rows="18" style="flex:1;min-height:280px">${escHtml(content)}</textarea>`;
+    const ta = document.getElementById('skill-sec-ta');
+    ta.addEventListener('input', () => { _editSkillSec[sec.title] = ta.value; });
+    setTimeout(() => ta.focus(), 80);
+  }
+}
+
+function _renderSkillFMEditor() {
+  const ed = document.getElementById('skill-modal-editor');
+  ed.innerHTML = `
+    <div class="editor-hdr">
+      <span class="editor-level">FM</span>
+      <span class="editor-ttl">基本信息</span>
+      <span class="editor-tag csec-tag-yaml">Frontmatter</span>
+    </div>
+    <div class="form-row">
+      <label class="form-label">名称 <span class="form-hint">（只读）</span></label>
+      <input class="form-input" value="${escHtml(_modalSkillData.name||'')}" readonly>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Version</label>
+      <input class="form-input" id="skfm-version" value="${escHtml(_editSkillFM.version||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Category</label>
+      <input class="form-input" id="skfm-category" value="${escHtml(_editSkillFM.category||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Subcategory</label>
+      <input class="form-input" id="skfm-subcategory" value="${escHtml(_editSkillFM.subcategory||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Domain</label>
+      <input class="form-input" id="skfm-domain" value="${escHtml(_editSkillFM.domain||'')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" id="skfm-desc" rows="3">${escHtml(_editSkillFM.description||'')}</textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Use Cases <span class="form-hint">每行一项</span></label>
+      <textarea class="form-textarea" id="skfm-usecases" rows="4">${escHtml(_editSkillFM.use_cases||'')}</textarea>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Automotive Standards <span class="form-hint">每行一项</span></label>
+      <textarea class="form-textarea" id="skfm-standards" rows="3">${escHtml(_editSkillFM.automotive_standards||'')}</textarea>
+    </div>`;
+  [['skfm-version','version'],['skfm-category','category'],['skfm-subcategory','subcategory'],
+   ['skfm-domain','domain'],['skfm-desc','description'],
+   ['skfm-usecases','use_cases'],['skfm-standards','automotive_standards']
+  ].forEach(([id, f]) => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener('input', () => { _editSkillFM[f] = e.value; });
+  });
+}
+
+/* ── Knowledge Areas Editor ── */
+function _isKnAreaSec(sec) {
+  if (!sec || !sec.title) return false;
+  const t = sec.title.toLowerCase().replace(/[\s_-]/g, '');
+  return t === 'knowledgeareas';
+}
+
+function _parseKnAreaYaml(str) {
+  if (!str || !str.trim()) return [];
+  try {
+    // 如果内容是 "knowledge_areas:\n  - ..." 形式，先取第一个顶层 key 的值
+    let parsed = jsyaml.load(str);
+    // 支持 {knowledge_areas: [...]} 对象包装格式
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const keys = Object.keys(parsed);
+      if (keys.length === 1 && Array.isArray(parsed[keys[0]])) parsed = parsed[keys[0]];
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(item => {
+      if (!item || typeof item !== 'object') return null;
+      // 支持 primary-area / secondary-area / area（兼容旧格式，映射为 primary-area）
+      const type = item['primary-area'] !== undefined ? 'primary-area'
+                 : item['secondary-area'] !== undefined ? 'secondary-area'
+                 : item['area'] !== undefined ? 'primary-area' : null;
+      if (!type) return null;
+      const rawKey = type === 'primary-area' && item['area'] !== undefined ? 'area'
+                   : type === 'secondary-area' ? 'secondary-area' : 'primary-area';
+      const name = (item[rawKey] !== null && item[rawKey] !== undefined ? item[rawKey] : type) + '';
+      const rawTopics = item.topics;
+      let topics = [];
+      if (Array.isArray(rawTopics)) {
+        topics = rawTopics.map(t => (t || '').toString().trim()).filter(Boolean);
+      } else if (typeof rawTopics === 'string' && rawTopics.trim()) {
+        topics = rawTopics.split('\n').map(t => t.trim()).filter(Boolean);
+      }
+      return { type, name, topics };
+    }).filter(Boolean);
+  } catch(e) { return []; }
+}
+
+function _dumpKnAreaYaml(data) {
+  if (!data || data.length === 0) return '';
+  return data.map(item => {
+    const esc = s => s.replace(/\\/g,'\\\\').replace(/"/g,'\\"');
+    const nameVal = '"' + esc(item.name || '') + '"';
+    const topicsStr = item.topics.length === 0
+      ? ' []'
+      : '\n' + item.topics.map(t => '    - "' + esc(t) + '"').join('\n');
+    return `- ${item.type}: ${nameVal}\n  topics:${topicsStr}`;
+  }).join('\n');
+}
+
+function _renderKnAreaEditor(sec) {
+  _knAreaSecTitle = sec.title;
+  const raw = _editSkillSec[sec.title] !== undefined ? _editSkillSec[sec.title] : (sec.content || '');
+  _knAreaData = _parseKnAreaYaml(raw);
+  const ed = document.getElementById('skill-modal-editor');
+  ed.innerHTML = `
+    <div class="editor-hdr" style="flex-wrap:wrap;gap:6px">
+      <span class="editor-ttl">${escHtml(sec.title)}</span>
+      <button class="btn-add-wf" onclick="_addKnAreaItem('primary-area')" style="margin-left:auto">＋ primary-area</button>
+      <button class="btn-add-wf" onclick="_addKnAreaItem('secondary-area')">＋ secondary-area</button>
+    </div>
+    <div id="kn-area-list" style="display:flex;flex-direction:column;gap:10px;margin-top:4px"></div>`;
+  _rebuildKnAreaEditor();
+}
+
+function _rebuildKnAreaEditor() {
+  const list = document.getElementById('kn-area-list');
+  if (!list) return;
+  if (_knAreaData.length === 0) {
+    list.innerHTML = `<div style="color:var(--tx-m);font-size:12px;text-align:center;padding:28px 0">暂无知识区域，点击上方按钮添加</div>`;
+    return;
+  }
+  list.innerHTML = _knAreaData.map((item, idx) => {
+    const isPrimary = item.type === 'primary-area';
+    const typeBg = isPrimary ? '#1f3358' : '#1a3327';
+    const typeFg = isPrimary ? 'var(--ca)' : 'var(--cs)';
+    const typeBd = isPrimary ? '#388bfd40' : '#3fb95040';
+    const topicsHtml = item.topics.map((t, ti) => `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+        <span style="color:var(--tx-m);font-size:10px;flex-shrink:0">▸</span>
+        <input class="form-input" style="flex:1;padding:4px 8px;font-size:11px"
+          value="${escHtml(t)}"
+          oninput="_syncKnAreaTopic(${idx},${ti},this.value)"
+          placeholder="topic 内容...">
+        <button onclick="_deleteKnAreaTopic(${idx},${ti})"
+          style="background:none;border:none;color:var(--tx-m);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:4px;line-height:1;transition:.15s"
+          onmouseover="this.style.color='var(--cr)'"
+          onmouseout="this.style.color='var(--tx-m)'">✕</button>
+      </div>`).join('');
+    return `
+    <div class="wf-card" id="kna-card-${idx}">
+      <div class="wf-card-hdr" onclick="toggleSSCard('kna-body-${idx}',this)" style="cursor:pointer">
+        <span class="ss-card-arr" style="color:var(--tx-m);font-size:15px;font-weight:700;transition:transform .15s;flex-shrink:0">›</span>
+        <span style="background:${typeBg};color:${typeFg};border:1px solid ${typeBd};
+          font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;flex-shrink:0">${item.type}</span>
+        <input class="wf-card-name" value="${escHtml(item.name)}"
+          oninput="_syncKnAreaName(${idx},this.value)"
+          onclick="event.stopPropagation()"
+          placeholder="卡片名称...">
+        <button onclick="event.stopPropagation();_deleteKnAreaItem(${idx})" class="btn-wf-del" title="删除此区域">✕</button>
+      </div>
+      <div id="kna-body-${idx}" style="padding:10px 12px">
+        <div style="font-size:10px;color:var(--tx-m);font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">Topics</div>
+        <div id="kna-topics-${idx}">${topicsHtml}</div>
+        <button onclick="_addKnAreaTopic(${idx})"
+          style="background:var(--bg-card2);border:1px dashed #3fb95040;color:var(--cs);
+            padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;
+            display:inline-flex;align-items:center;gap:4px;margin-top:6px;transition:.15s"
+          onmouseover="this.style.borderColor='var(--cs)'"
+          onmouseout="this.style.borderColor='#3fb95040'">＋ 添加 Topic</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _syncKnAreaToCache() {
+  if (!_knAreaSecTitle) return;
+  _editSkillSec[_knAreaSecTitle] = _dumpKnAreaYaml(_knAreaData);
+}
+
+function _syncKnAreaName(idx, val) {
+  if (_knAreaData[idx]) { _knAreaData[idx].name = val; _syncKnAreaToCache(); }
+}
+
+function _syncKnAreaTopic(idx, ti, val) {
+  if (_knAreaData[idx] && _knAreaData[idx].topics[ti] !== undefined) {
+    _knAreaData[idx].topics[ti] = val;
+    _syncKnAreaToCache();
+  }
+}
+
+function _addKnAreaItem(type) {
+  let name = type;
+  let suffix = 1;
+  const existingNames = _knAreaData.map(d => d.name);
+  while (existingNames.includes(name)) { name = type + '-' + (suffix++); }
+  _knAreaData.push({ type, name, topics: [] });
+  _syncKnAreaToCache();
+  _rebuildKnAreaEditor();
+}
+
+function _deleteKnAreaItem(idx) {
+  _knAreaData.splice(idx, 1);
+  _syncKnAreaToCache();
+  _rebuildKnAreaEditor();
+}
+
+function _addKnAreaTopic(idx) {
+  if (_knAreaData[idx]) {
+    _knAreaData[idx].topics.push('');
+    _syncKnAreaToCache();
+    _rebuildKnAreaEditor();
+    setTimeout(() => {
+      const container = document.getElementById('kna-topics-' + idx);
+      if (container) {
+        const inputs = container.querySelectorAll('input');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      }
+    }, 50);
+  }
+}
+
+function _deleteKnAreaTopic(idx, ti) {
+  if (_knAreaData[idx]) {
+    _knAreaData[idx].topics.splice(ti, 1);
+    _syncKnAreaToCache();
+    _rebuildKnAreaEditor();
+  }
+}
+
+/* ── Instructions Editor ── */
+function _isInstrSec(sec) {
+  if (!sec || !sec.title) return false;
+  return sec.title.toLowerCase().replace(/[\s_-]/g, '') === 'instructions';
+}
+
+/* 解析 instructions yaml 块，提取 A/B/C/D 段落内容
+ * 支持格式：```yaml\n段落 A：Title\n  content...\n段落 B：...```
+ * 返回: { 'A. Approach（执行步骤）': 'content...', 'B. Standards...': '...', ... }
+ */
+function _parseInstrYamlBlocks(rawContent) {
+  if (!rawContent) return {};
+  // 去掉 ```yaml ... ``` 代码围栏
+  const content = rawContent
+    .replace(/^[\s\S]*?```ya?ml\s*\n/i, '')
+    .replace(/\n?```[\s]*$/, '');
+  const result = {};
+  const headerRe = /^段落\s+([A-Z])[：:]\s*(.+)$/gm;
+  const headers = [];
+  let m;
+  while ((m = headerRe.exec(content)) !== null) {
+    headers.push({ letter: m[1], pos: m.index, endOfLine: m.index + m[0].length });
+  }
+  headers.forEach((h, i) => {
+    const nlPos   = content.indexOf('\n', h.endOfLine);
+    const bodyStart = nlPos >= 0 ? nlPos + 1 : h.endOfLine;
+    const bodyEnd   = i + 1 < headers.length ? headers[i + 1].pos : content.length;
+    const body = content.slice(bodyStart, bodyEnd).replace(/^  /gm, '').trim();
+    // 匹配对应的 _INSTR_PRESETS label（如 "A. Approach..."）
+    const preset = _INSTR_PRESETS.find(p => p.label.startsWith(h.letter + '.'));
+    if (preset) result[preset.label] = body;
+  });
+  return result;
+}
+
+const _INSTR_PRESETS = [
+  {
+    label: 'A. Approach（执行步骤）',
+    defaultContent: `当被调用执行驱动开发任务时：\n1. 查询相关知识库文档（芯片手册/接口规范）\n2. 评审硬件原理图，确认接口参数\n3. 按 AUTOSAR 规范实现初始化与控制 API\n4. 🤖 AGENT CHECK：验证接口时序与参数正确性\n5. 实现故障检测状态机，确保每个故障模式均有对应处理动作\n6. 🤖 AGENT CHECK：验证所有保护逻辑满足安全等级要求\n7. 调用 \`tools/static_analyzer\` 执行 MISRA-C 检查\n8. 调用 \`tools/unit_test_runner\` 执行单元测试，验证覆盖率达标`
+  },
+  {
+    label: 'B. Standards & Best Practices（规范遵循）',
+    defaultContent: `- 遵循 \`rules/coding-rules.md\`（编码规范）\n- 遵循 AUTOSAR 相关 SWS 接口规范\n- 遵循 MISRA-C:2012 全规则集（零未批准违规）\n- ASIL-B 及以上：强制 peer review，关键路径必须有测试覆盖`
+  },
+  {
+    label: 'C. Deliverables（交付物定义）',
+    defaultContent: `每次执行必须输出：\n- **驱动源码**：\`<Module>_Drv.c / .h\`，含完整 Doxygen 注释\n- **配置文件**：\`<Module>_Cfg.h\`，含编译开关与阈值参数宏\n- **单元测试**：\`Test_<Feature>.c\`，基于 Unity/ceedling 框架\n- **评审清单**：MISRA 合规报告 + 故障路径覆盖矩阵`
+  },
+  {
+    label: 'D. Safety & Security Considerations（安全合规检查）',
+    defaultContent: `- 验证通信失败时驱动进入安全状态\n- 验证边界条件的安全处理逻辑\n- ✋ HUMAN CHECK：若驱动用于 ASIL-C/D 安全关键功能，需人工审查保护逻辑`
+  }
+];
+
+function _renderInstrEditor(sec) {
+  const ed = document.getElementById('skill-modal-editor');
+
+  // ── 解析 yaml 块内容，用于预填默认数据 ──
+  const _instrRaw    = _editSkillSec[sec.title] !== undefined ? _editSkillSec[sec.title] : (sec.content || '');
+  const _instrParsed = _parseInstrYamlBlocks(_instrRaw);
+
+  // ── 自动初始化：当 SKILL.md 中 instructions 为 yaml 块（无子节）时，解析并预填子节 ──
+  if (!(sec.children && sec.children.length) && !_instrNewChildren['instructions']) {
+    const parsedKeys = Object.keys(_instrParsed);
+    if (parsedKeys.length > 0) {
+      _instrNewChildren['instructions'] = [];
+      parsedKeys.forEach(label => {
+        _instrNewChildren['instructions'].push(label);
+        if (_editSkillSec[label] === undefined) _editSkillSec[label] = _instrParsed[label];
+      });
+    }
+  }
+
+  const existingChildren = sec.children || [];
+  const existingTitles   = new Set(existingChildren.map(c => c.title));
+  const newChildTitles   = _instrNewChildren['instructions'] || [];
+  const allChildTitles   = new Set([...existingTitles, ...newChildTitles]);
+  const availPresets     = _INSTR_PRESETS.filter(p => !allChildTitles.has(p.label));
+
+  // Existing child cards
+  const cardsHtml = existingChildren.map((child, _ci) => {
+    const content = _editSkillSec[child.title] !== undefined ? _editSkillSec[child.title] : (child.content || '');
+    const _bid = 'instr-ex-' + _ci;
+    return `<div class="wf-card" style="padding:0;overflow:hidden;margin-bottom:6px">
+      <div onclick="toggleSSCard('${_bid}',this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.07);cursor:pointer;user-select:none">
+        <span class="ss-card-arr" style="color:var(--tx-m);font-size:15px;font-weight:700;transition:transform .15s;flex-shrink:0">›</span>
+        <span style="flex:1;font-size:13px;font-weight:600;color:var(--tx-p);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(child.title)}">${escHtml(child.title)}</span>
+      </div>
+      <div id="${_bid}">
+        <textarea class="form-textarea instr-child-ta" style="border:none;border-radius:0;margin:0;resize:vertical;min-height:90px;background:rgba(255,255,255,.02)"
+          rows="5" data-child="${escHtml(child.title)}">${escHtml(content)}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Newly added child cards
+  const newCardsHtml = newChildTitles.map((title, _ni) => {
+    const content = _editSkillSec[title] || '';
+    const _bid = 'instr-nw-' + _ni;
+    return `<div class="wf-card" style="padding:0;overflow:hidden;margin-bottom:6px;border-color:rgba(0,200,100,.3)">
+      <div onclick="toggleSSCard('${_bid}',this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,200,100,.06);border-bottom:1px solid rgba(0,200,100,.2);cursor:pointer;user-select:none">
+        <span class="ss-card-arr" style="color:var(--tx-m);font-size:15px;font-weight:700;transition:transform .15s;flex-shrink:0">›</span>
+        <span style="flex:1;font-size:13px;font-weight:600;color:var(--tx-p);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(title)}">${escHtml(title)}</span>
+        <span style="font-size:10px;padding:2px 7px;border-radius:3px;background:rgba(0,200,100,.2);color:#00c864;flex-shrink:0">新增</span>
+        <button class="btn-wf-del instr-del-btn" data-del-title="${escHtml(title)}" title="撤销新增" style="flex-shrink:0" onclick="event.stopPropagation()">✕</button>
+      </div>
+      <div id="${_bid}">
+        <textarea class="form-textarea instr-child-ta" style="border:none;border-radius:0;margin:0;resize:vertical;min-height:90px;background:rgba(0,200,100,.02)"
+          rows="5" data-child="${escHtml(title)}">${escHtml(content)}</textarea>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Add panel
+  const addPanelHtml = availPresets.length > 0
+    ? `<div style="padding:4px 0 8px">
+        <button class="btn-add-wf" id="instr-add-trigger">＋ 添加子节</button>
+        <div id="instr-add-panel" style="display:none;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:12px;margin-top:8px">
+          <div class="form-row" style="margin-bottom:10px">
+            <label class="form-label" style="margin-bottom:5px">选择配置项 <span class="form-hint">（仅显示未添加的项）</span></label>
+            <select class="form-input" id="instr-preset-sel">
+              ${availPresets.map(p => `<option value="${escHtml(p.label)}">${escHtml(p.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label class="form-label" style="margin-bottom:5px">默认内容 <span class="form-hint">（可修改后添加）</span></label>
+            <textarea class="form-textarea" id="instr-new-content" rows="7">${escHtml(availPresets[0] ? (_instrParsed[availPresets[0].label] || availPresets[0].defaultContent || '') : '')}</textarea>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-add-wf" id="instr-confirm-add" style="background:var(--ca);color:#000;padding:5px 18px;font-weight:700">✓ 确认添加</button>
+            <button class="btn-add-wf" id="instr-cancel-add" style="padding:5px 14px;background:rgba(255,255,255,.08)">取消</button>
+          </div>
+        </div>
+      </div>`
+    : `<div style="padding:6px 0;color:var(--tx-m);font-size:.82em;opacity:.7">✓ 所有预设配置项均已添加</div>`;
+
+  ed.innerHTML = `
+    <div class="editor-hdr" style="flex-wrap:wrap;gap:6px">
+      <span class="editor-ttl">instructions</span>
+    </div>
+    <div style="display:flex;flex-direction:column;flex:1;overflow-y:auto;padding-right:2px">
+      ${cardsHtml}${newCardsHtml}
+      ${addPanelHtml}
+    </div>`;
+
+  // Bind textarea events
+  ed.querySelectorAll('.instr-child-ta').forEach(ta => {
+    ta.addEventListener('input', () => { _editSkillSec[ta.dataset.child] = ta.value; });
+  });
+
+  // Bind delete buttons
+  ed.querySelectorAll('.instr-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => _instrDelNew(btn.dataset.delTitle));
+  });
+
+  // Bind add panel controls
+  const addTrigger = document.getElementById('instr-add-trigger');
+  const addPanel   = document.getElementById('instr-add-panel');
+  const presetSel  = document.getElementById('instr-preset-sel');
+  const confirmBtn = document.getElementById('instr-confirm-add');
+  const cancelBtn  = document.getElementById('instr-cancel-add');
+
+  if (addTrigger && addPanel) {
+    addTrigger.addEventListener('click', () => {
+      addPanel.style.display = 'block';
+      addTrigger.style.display = 'none';
+    });
+  }
+  if (cancelBtn && addPanel && addTrigger) {
+    cancelBtn.addEventListener('click', () => {
+      addPanel.style.display = 'none';
+      addTrigger.style.display = '';
+    });
+  }
+  if (presetSel) {
+    presetSel.addEventListener('change', () => {
+      const preset = _INSTR_PRESETS.find(p => p.label === presetSel.value);
+      const ta = document.getElementById('instr-new-content');
+      if (preset && ta) ta.value = _instrParsed[preset.label] || preset.defaultContent || '';
+    });
+  }
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', () => {
+      const title     = presetSel ? presetSel.value : '';
+      const contentTa = document.getElementById('instr-new-content');
+      if (!title || !contentTa) return;
+      // Double-check no duplicate
+      const existCh = ((_modalSkillData.sections || []).find(s => _isInstrSec(s)) || {}).children || [];
+      const newOnes  = _instrNewChildren['instructions'] || [];
+      const allNow   = new Set([...existCh.map(c => c.title), ...newOnes]);
+      if (allNow.has(title)) { toast('⚠️ 该配置项已存在：' + title, 'm'); return; }
+      if (!_instrNewChildren['instructions']) _instrNewChildren['instructions'] = [];
+      _instrNewChildren['instructions'].push(title);
+      _editSkillSec[title] = contentTa.value;
+      // Re-render
+      const instrSec = (_modalSkillData.sections || []).find(s => _isInstrSec(s));
+      if (instrSec) _renderInstrEditor(instrSec);
+    });
+  }
+}
+
+function _instrDelNew(title) {
+  if (_instrNewChildren['instructions']) {
+    const idx = _instrNewChildren['instructions'].indexOf(title);
+    if (idx >= 0) _instrNewChildren['instructions'].splice(idx, 1);
+  }
+  delete _editSkillSec[title];
+  const instrSec = (_modalSkillData.sections || []).find(s => _isInstrSec(s));
+  if (instrSec) _renderInstrEditor(instrSec);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STRUCTURED SECTION EDITORS
+   constraints / tools_required / related_skills /
+   integration_points / performance_criteria / validation /
+   human_checks / examples / metadata
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Skill 路径选择器 ───────────────────────────────────────────────────────────── */
+let _availSkillPaths = [];
+async function _loadAvailSkillPaths() {
+  try {
+    const r = await fetch('/api/list_skills');
+    if (r.ok) { const d = await r.json(); _availSkillPaths = d.paths || []; }
+  } catch(e) { /* server offline – list stays empty */ }
+}
+_loadAvailSkillPaths(); // 页面加载时自动获取
+
+/* ── Tool 路径选择器 ──────────────────────────────────────────────────────────── */
+let _availToolPaths = [];
+async function _loadAvailToolPaths() {
+  try {
+    const r = await fetch('/api/list_tools');
+    if (r.ok) { const d = await r.json(); _availToolPaths = d.paths || []; }
+  } catch(e) { /* server offline – list stays empty */ }
+}
+_loadAvailToolPaths(); // 页面加载时自动获取
+
+const _SS_CFGS = {
+  constraints: {
+    type:'stringlist', key:'constraints', label:'约束条件', icon:'🚫',
+    placeholder:'约束条件描述...', addLabel:'+ 添加约束'
+  },
+  tools_required: {
+    type:'stringlist', key:'tools_required', label:'所需工具', icon:'🔧',
+    placeholder:'tools/tool_name.py', addLabel:'+ 添加工具', toolPath:true
+  },
+  related_skills: {
+    type:'cardlist', key:'related_skills', label:'关联 Skills', icon:'🔗',
+    addLabel:'+ 添加关联 Skill',
+    fields:[
+      { key:'skill',        label:'Skill',        placeholder:'skills/spi/SKILL.md', flex:1, skillPath:true },
+      { key:'relationship', label:'Relationship', placeholder:'prerequisite', flex:1,
+        options:['prerequisite','complementary','builds-upon','alternative'] }
+    ]
+  },
+  integration_points: {
+    type:'cardlist', key:'integration_points', label:'集成接口', icon:'🔌',
+    addLabel:'+ 添加集成接口',
+    fields:[
+      { key:'system',    label:'System',    placeholder:'目标系统名称...',  full:true },
+      { key:'interface', label:'Interface', placeholder:'SPI / CAN ...',   flex:1 },
+      { key:'protocol',  label:'Protocol',  placeholder:'AUTOSAR 规范...', full:true }
+    ]
+  },
+  performance_criteria: {
+    type:'cardlist', key:'performance_criteria', label:'性能指标', icon:'📊',
+    addLabel:'+ 添加性能指标',
+    fields:[
+      { key:'metric', label:'Metric', placeholder:'指标名称...', flex:1 },
+      { key:'target', label:'Target', placeholder:'目标值...',   full:true }
+    ]
+  },
+  validation: {
+    type:'cardlist', key:'validation', label:'验证方法', icon:'✅',
+    addLabel:'+ 添加验证方法',
+    fields:[
+      { key:'method',  label:'Method',  placeholder:'验证方法...', flex:1 },
+      { key:'_detail', label:'Details', placeholder:'验证详情...', full:true,
+        varKeys:['coverage','scope','requirements'] }
+    ]
+  },
+  human_checks: {
+    type:'cardlist', key:'human_checks', label:'Human Checks', icon:'✋',
+    addLabel:'+ 添加 Human Check',
+    fields:[
+      { key:'condition', label:'Condition', placeholder:'触发条件...', full:true, multiline:true, rows:3 },
+      { key:'action',    label:'Action',    placeholder:'处理动作...', full:true, multiline:true, rows:3 }
+    ]
+  },
+  examples: {
+    type:'cardlist', key:'examples', label:'示例', icon:'💡',
+    addLabel:'+ 添加示例',
+    fields:[
+      { key:'prompt',   label:'Prompt',   placeholder:'用户输入示例...', full:true, multiline:true, rows:3 },
+      { key:'response', label:'Response', full:true, subfields:[
+          { key:'分析说明', label:'分析说明', placeholder:'分析过程与背景说明...', rows:4 },
+          { key:'代码片段', label:'代码片段', placeholder:'```c\n// 代码示例...\n```', rows:8, mono:true },
+          { key:'检查结论', label:'检查结论', placeholder:'MISRA/合规/逻辑检查结果...', rows:4 },
+          { key:'建议',    label:'建议',    placeholder:'优化建议与注意事项...', rows:3 }
+        ]
+      }
+    ]
+  },
+  metadata: {
+    type:'metadata', key:'metadata', label:'Metadata', icon:'📄'
+  }
+};
+
+function _getSSCfg(sec) {
+  if (!sec || !sec.title) return null;
+  const t = sec.title.toLowerCase().replace(/[\s-]/g, '_');
+  return _SS_CFGS[t] || null;
+}
+
+function _parseSSData(raw, cfg) {
+  if (!raw || !raw.trim()) return [];
+  try {
+    let parsed = jsyaml.load(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const keys = Object.keys(parsed);
+      if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
+        parsed = parsed[keys[0]];
+      } else {
+        // metadata or single-object
+        return [{ _meta: parsed.metadata || parsed, _tags: parsed.tags || [] }];
+      }
+    }
+    if (!Array.isArray(parsed)) return [];
+    if (cfg.type === 'stringlist') {
+      return parsed.map(s => ({ value: String(s || '') }));
+    }
+    return parsed.map(item => {
+      if (typeof item !== 'object' || item === null) return { _raw: String(item) };
+      const obj = Object.assign({}, item);
+      (cfg.fields || []).forEach(f => {
+        if (f.varKeys) {
+          let found = false;
+          for (const vk of f.varKeys) {
+            if (obj[vk] !== undefined) {
+              obj[f.key]          = obj[vk];
+              obj['_vk_' + f.key] = vk;
+              found = true; break;
+            }
+          }
+          if (!found) obj[f.key] = '';
+        }
+      });
+      return obj;
+    });
+  } catch(e) { return []; }
+}
+
+function _dumpSSData(data, cfg) {
+  if (!data || !cfg) return '';
+  if (cfg.type === 'metadata') {
+    const d = data[0] || {};
+    return jsyaml.dump({ metadata: d._meta || {}, tags: d._tags || [] }, { lineWidth:120, indent:2 });
+  }
+  if (cfg.type === 'stringlist') {
+    if (!data.length) return cfg.key + ':\n  []\n';
+    return jsyaml.dump({ [cfg.key]: data.map(d => d.value || '') }, { lineWidth:120, indent:2 });
+  }
+  const cleanItems = data.map(item => {
+    const obj = {};
+    (cfg.fields || []).forEach(f => {
+      if (f.varKeys) {
+        const vk = item['_vk_' + f.key] || f.varKeys[0];
+        obj[vk] = item[f.key] || '';
+      } else if (!f.key.startsWith('_')) {
+        obj[f.key] = item[f.key] || '';
+      }
+    });
+    return obj;
+  });
+  return jsyaml.dump({ [cfg.key]: cleanItems }, { lineWidth:120, indent:2 });
+}
+
+/* ── Response subfields helpers ── */
+function _parseRespSubfields(str, subfields) {
+  const result = {};
+  subfields.forEach(sf => { result[sf.key] = ''; });
+  if (!str) return result;
+  // Split on "## Header" boundaries
+  const parts = str.split(/^## /m).filter(Boolean);
+  for (const part of parts) {
+    const nl = part.indexOf('\n');
+    if (nl < 0) continue;
+    const header  = part.slice(0, nl).trim();
+    const content = part.slice(nl + 1).trim();
+    const sf = subfields.find(s => s.key === header || s.label === header);
+    if (sf) result[sf.key] = content;
+  }
+  return result;
+}
+
+function _dumpRespSubfields(parts, subfields) {
+  return subfields.map(sf => {
+    const content = (parts[sf.key] || '').trimEnd();
+    return '## ' + sf.label + '\n' + content;
+  }).join('\n\n');
+}
+
+function _renderSSEditor(sec, cfg) {
+  _ssTitle = sec.title;
+  _ssCfg   = cfg;
+  const raw = _editSkillSec[sec.title] !== undefined ? _editSkillSec[sec.title] : (sec.content || '');
+  _ssData  = _parseSSData(raw, cfg);
+  if (cfg.type === 'metadata') { _renderSSMetadata(); return; }
+  // 如果有 skillPath 字段且路径列表未加载，先加载再渲染
+  if ((cfg.fields||[]).some(f=>f.skillPath) && !_availSkillPaths.length) {
+    _loadAvailSkillPaths().then(() => _rebuildSSEditor());
+  } else if (cfg.toolPath && !_availToolPaths.length) {
+    _loadAvailToolPaths().then(() => _rebuildSSEditor());
+  } else {
+    _rebuildSSEditor();
+  }
+}
+
+function _ssPreviewUpd(el, val) {
+  const _c = el.closest('.wf-card');
+  if (_c) { const _s = _c.querySelector('[data-preview]');
+    if (_s) _s.textContent = (val||'').replace(/\n/g,' ').slice(0,55)+((val||'').length>55?'…':'') || '（空）'; }
+}
+
+function _rebuildSSEditor() {
+  const cfg = _ssCfg;
+  if (!cfg) return;
+  const ed = document.getElementById('skill-modal-editor');
+  const hdr = `<div class="editor-hdr"><span class="editor-ttl">${cfg.icon} ${escHtml(_ssTitle)}</span></div>`;
+
+  if (cfg.type === 'stringlist') {
+    const items = _ssData.map((item, idx) => {
+      const _pv = (item.value||'').replace(/\n/g,' ').slice(0,55)+((item.value||'').length>55?'\u2026':'') || '\uff08\u7a7a\uff09';
+      const _bid = 'ssl-'+_ssTitle.replace(/\W/g,'')+'-'+idx;
+      let _bodyHtml;
+      if (cfg.toolPath) {
+        const _tpOpts = (_availToolPaths||[]);
+        const _tpCur  = item.value||'';
+        const _tpAll  = _tpOpts.includes(_tpCur) ? _tpOpts : (_tpCur ? [_tpCur].concat(_tpOpts) : _tpOpts);
+        _bodyHtml = _tpOpts.length > 0
+          ? `<select class="form-input" style="width:100%" onchange="_ssSetStr(${idx},this.value);_ssPreviewUpd(this,this.value)">
+              <option value="">\u2014 \u9009\u62e9\u5de5\u5177\u8def\u5f84 \u2014</option>
+              ${_tpAll.map(o=>`<option value="${escHtml(o)}"${o===_tpCur?' selected':''}>${escHtml(o)}</option>`).join('')}
+            </select>`
+          : `<input class="form-input" style="width:100%" value="${escHtml(_tpCur)}"
+              placeholder="${escHtml(cfg.placeholder||'')}"
+              oninput="_ssSetStr(${idx},this.value);_ssPreviewUpd(this,this.value)">`;
+      } else {
+        _bodyHtml = `<textarea class="form-textarea" style="width:100%;min-height:60px;resize:vertical" rows="2"
+            placeholder="${escHtml(cfg.placeholder || '')}"
+            oninput="_ssSetStr(${idx},this.value);_ssPreviewUpd(this,this.value)">${escHtml(item.value || '')}</textarea>`;
+      }
+      return `
+      <div class="wf-card" style="margin-bottom:4px;padding:0;overflow:hidden">
+        <div onclick="toggleSSCard('${_bid}',this)" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;user-select:none">
+          <span class="ss-card-arr" style="color:var(--tx-m);font-size:15px;font-weight:700;transition:transform .15s;flex-shrink:0">›</span>
+          <span style="font-size:11px;color:var(--tx-d);font-weight:600;min-width:16px;text-align:right">${idx + 1}</span>
+          <span data-preview="1" style="flex:1;font-size:11px;color:var(--tx-p);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(_pv)}</span>
+          <button class="btn-wf-del" onclick="event.stopPropagation();_ssDelItem(${idx})" title="删除">✕</button>
+        </div>
+        <div id="${_bid}" style="display:none;padding:8px 12px;border-top:1px solid rgba(255,255,255,.07)">
+          ${_bodyHtml}
+        </div>
+      </div>`;
+    }).join('');
+    ed.innerHTML = hdr +
+      `<div id="ss-list">${items || '<div style="color:var(--tx-d);font-size:12px;padding:12px">暂无数据</div>'}</div>
+       <div style="padding:6px 0"><button class="btn-add-wf" onclick="_ssAddStr()">${escHtml(cfg.addLabel || '+ 添加')}</button></div>`;
+  } else {
+    const cards = _ssData.map((item, idx) => {
+      const fieldsHtml = (cfg.fields || []).map(f => {
+        const val = escHtml(item[f.key] || '');
+        const sty = f.full ? 'width:100%' : ('flex:' + (f.flex || 1));
+        let inputEl;
+        if (f.subfields) {
+          // Response 拆分子字段渲染
+          const sfVals = _parseRespSubfields(item[f.key] || '', f.subfields);
+          const sfHtml = f.subfields.map(sf => `
+            <div style="margin-bottom:10px">
+              <label class="form-label" style="margin-bottom:3px;font-size:11px;color:var(--tx-m)">${escHtml(sf.label)}</label>
+              <textarea class="form-textarea" rows="${sf.rows || 4}"
+                style="width:100%;min-height:${(sf.rows || 4) * 22}px${sf.mono ? ';font-family:monospace;font-size:11px' : ''}"
+                oninput="_ssSetSubfield(${idx},'${f.key}','${sf.key}',this.value)"
+                placeholder="${escHtml(sf.placeholder || '')}">${escHtml(sfVals[sf.key] || '')}</textarea>
+            </div>`).join('');
+          return `<div class="form-row" style="margin-bottom:5px">
+            <label class="form-label" style="margin-bottom:6px">${escHtml(f.label)}</label>
+            <div style="border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:10px 12px;background:rgba(255,255,255,.02)">${sfHtml}</div>
+          </div>`;
+        } else if (f.options) {
+          const curVal = item[f.key] || '';
+          const allOpts = f.options.includes(curVal) ? f.options : [curVal].concat(f.options);
+          inputEl = `<select class="form-input" style="${sty}" onchange="_ssSetField(${idx},'${f.key}',this.value)">${
+            allOpts.map(o => `<option value="${escHtml(o)}" ${o === curVal ? 'selected' : ''}>${escHtml(o)}</option>`).join('')
+          }</select>`;
+        } else if (f.skillPath) {
+          const _spOpts = (_availSkillPaths||[]);
+          const _spAOpts = _spOpts.includes(val) ? _spOpts : (val ? [val].concat(_spOpts) : _spOpts);
+          inputEl = _spOpts.length > 0
+            ? `<select class="form-input" style="${sty}" onchange="_ssSetField(${idx},'${f.key}',this.value);_ssPreviewUpd(this,this.value)">
+                <option value="">— 选择 Skill 路径 —</option>
+                ${_spAOpts.map(o=>`<option value="${escHtml(o)}"${o===val?' selected':''}>${escHtml(o)}</option>`).join('')}
+              </select>`
+            : `<input class="form-input" style="${sty}" value="${val}"
+                placeholder="${escHtml(f.placeholder||'')}"
+                oninput="_ssSetField(${idx},'${f.key}',this.value)">`;
+        } else if (f.multiline) {
+          inputEl = `<textarea class="form-textarea" rows="${f.rows || 3}" style="${sty};min-height:${(f.rows || 3) * 22}px"
+            oninput="_ssSetField(${idx},'${f.key}',this.value)">${val}</textarea>`;
+        } else {
+          inputEl = `<input class="form-input" style="${sty}" value="${val}"
+            placeholder="${escHtml(f.placeholder || '')}" oninput="_ssSetField(${idx},'${f.key}',this.value)">`;
+        }
+        return `<div class="form-row" style="margin-bottom:5px">
+          <label class="form-label" style="margin-bottom:2px">${escHtml(f.label)}</label>
+          ${f.full ? inputEl : `<div style="display:flex;gap:6px">${inputEl}</div>`}
+        </div>`;
+      }).join('');
+      const firstF = (cfg.fields || [])[0];
+      const preview = firstF ? (item[firstF.key] || '') : '';
+      const previewTxt = (preview.replace(/\n/g,' ').slice(0,55) + (preview.length > 55 ? '…' : '')) || '（空）';
+      const bodyId = 'ssc-' + _ssTitle.replace(/\W/g,'') + '-' + idx;
+      return `<div class="wf-card" style="margin-bottom:6px;padding:0;overflow:hidden">
+        <div onclick="toggleSSCard('${bodyId}',this)" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;user-select:none">
+          <span class="ss-card-arr" style="color:var(--tx-m);font-size:15px;font-weight:700;transition:transform .15s;flex-shrink:0">›</span>
+          <span style="font-size:11px;color:var(--tx-d);font-weight:600;min-width:16px;text-align:right">${idx + 1}</span>
+          <span data-preview="1" style="flex:1;font-size:11px;color:var(--tx-p);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(previewTxt)}</span>
+          <button class="btn-wf-del" onclick="event.stopPropagation();_ssDelItem(${idx})" title="删除">✕</button>
+        </div>
+        <div id="${bodyId}" style="display:none;padding:10px 12px;border-top:1px solid rgba(255,255,255,.07)">
+          ${fieldsHtml}
+        </div>
+      </div>`;
+    }).join('');
+    ed.innerHTML = hdr +
+      `<div id="ss-list">${cards || '<div style="color:var(--tx-d);font-size:12px;padding:12px">暂无数据，点击下方按钮添加</div>'}</div>
+       <div style="padding:6px 0"><button class="btn-add-wf" onclick="_ssAddCard()">${escHtml(cfg.addLabel || '+ 添加')}</button></div>`;
+  }
+}
+
+function _renderSSMetadata() {
+  const raw = _editSkillSec[_ssTitle] !== undefined ? _editSkillSec[_ssTitle] : '';
+  let mo = {}, tagsArr = [];
+  try {
+    const p = jsyaml.load(raw) || {};
+    mo = p.metadata || p;
+    tagsArr = p.tags || [];
+  } catch(e) {}
+  _ssData = [{ _meta: mo, _tags: tagsArr }];
+  const ed = document.getElementById('skill-modal-editor');
+  const mOpts = (list, cur) => list.map(v =>
+    `<option value="${v}" ${v === cur ? 'selected' : ''}>${v}</option>`).join('');
+  ed.innerHTML = `
+    <div class="editor-hdr">
+      <span class="editor-ttl">📄 ${escHtml(_ssTitle)}</span>
+      <span class="editor-tag csec-tag-yaml">YAML</span>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Author</label>
+      <input class="form-input" id="ss-m-author" value="${escHtml(mo.author || '')}">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Last Updated</label>
+      <input class="form-input" id="ss-m-date" value="${escHtml(mo.last_updated || '')}" placeholder="2026-05-28">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Maturity</label>
+      <select class="form-input" id="ss-m-maturity">
+        ${mOpts(['draft','alpha','beta','stable','deprecated'], mo.maturity || 'beta')}
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Complexity</label>
+      <select class="form-input" id="ss-m-complexity">
+        ${mOpts(['beginner','intermediate','advanced','expert'], mo.complexity || 'intermediate')}
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Estimated Time</label>
+      <input class="form-input" id="ss-m-time" value="${escHtml(mo.estimated_time || '')}" placeholder="20-40 分钟">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Tags <span class="form-hint">逗号分隔</span></label>
+      <input class="form-input" id="ss-m-tags" value="${escHtml((tagsArr || []).join(', '))}" placeholder="automotive, spi, misra...">
+    </div>`;
+  const syncMeta = () => {
+    const author     = (document.getElementById('ss-m-author')?.value     || '').trim();
+    const date       = (document.getElementById('ss-m-date')?.value       || '').trim();
+    const maturity   =  document.getElementById('ss-m-maturity')?.value   || 'beta';
+    const complexity =  document.getElementById('ss-m-complexity')?.value || 'intermediate';
+    const time       = (document.getElementById('ss-m-time')?.value       || '').trim();
+    const tags       = (document.getElementById('ss-m-tags')?.value || '').split(',').map(s => s.trim()).filter(Boolean);
+    _editSkillSec[_ssTitle] = jsyaml.dump(
+      { metadata: { author, last_updated: date, maturity, complexity, estimated_time: time }, tags },
+      { lineWidth: 120, indent: 2 }
+    );
+  };
+  ['ss-m-author','ss-m-date','ss-m-maturity','ss-m-complexity','ss-m-time','ss-m-tags'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.addEventListener('input', syncMeta); el.addEventListener('change', syncMeta); }
+  });
+}
+
+function _ssSetStr(idx, val)        { if (_ssData[idx]) { _ssData[idx].value  = val; _ssSyncCache(); } }
+function _ssSetField(idx, key, val) { if (_ssData[idx]) { _ssData[idx][key]   = val; _ssSyncCache(); } }
+function _ssSetSubfield(idx, key, sfKey, val) {
+  if (!_ssData[idx] || !_ssCfg) return;
+  const field = (_ssCfg.fields || []).find(f => f.key === key);
+  if (!field || !field.subfields) return;
+  const current = _parseRespSubfields(_ssData[idx][key] || '', field.subfields);
+  current[sfKey] = val;
+  _ssData[idx][key] = _dumpRespSubfields(current, field.subfields);
+  _ssSyncCache();
+}
+
+function _ssDelItem(idx) {
+  _ssData.splice(idx, 1);
+  _ssSyncCache();
+  _rebuildSSEditor();
+}
+
+function _ssAddStr() {
+  _ssData.push({ value: '' });
+  _ssSyncCache();
+  _rebuildSSEditor();
+  setTimeout(() => {
+    const els = document.querySelectorAll('#ss-list .form-input');
+    if (els.length) els[els.length - 1].focus();
+  }, 50);
+}
+
+function _ssAddCard() {
+  const newItem = {};
+  (_ssCfg.fields || []).forEach(f => { newItem[f.key] = f.options ? f.options[0] : ''; });
+  _ssData.push(newItem);
+  _ssSyncCache();
+  _rebuildSSEditor();
+  setTimeout(() => {
+    const flen = (_ssCfg.fields || []).length;
+    const els = document.querySelectorAll('#ss-list .form-input, #ss-list .form-textarea, #ss-list select');
+    if (els.length >= flen) els[els.length - flen].focus();
+  }, 50);
+}
+
+function _ssSyncCache() {
+  if (_ssTitle && _ssCfg) _editSkillSec[_ssTitle] = _dumpSSData(_ssData, _ssCfg);
+}
+
+function toggleSSCard(id, hdrEl) {
+  const body = document.getElementById(id);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  const arr = hdrEl ? hdrEl.querySelector('.ss-card-arr') : null;
+  if (arr) arr.style.transform = isOpen ? '' : 'rotate(90deg)';
+}
+
+async function saveSkillConfig() {
+  const skillId = document.getElementById('skill-modal-id').value;
+  if (!skillId) return;
+  const btn = document.getElementById('skill-save-btn');
+  btn.classList.add('saving'); btn.innerHTML = '⏳ 保存中...';
+  const fm_fields = {
+    version:              _editSkillFM.version || '',
+    category:             _editSkillFM.category || '',
+    subcategory:          _editSkillFM.subcategory || '',
+    domain:               _editSkillFM.domain || '',
+    description:          _editSkillFM.description || '',
+    use_cases:            (_editSkillFM.use_cases||'').split('\n').map(s=>s.trim()).filter(Boolean),
+    automotive_standards: (_editSkillFM.automotive_standards||'').split('\n').map(s=>s.trim()).filter(Boolean),
+  };
+  const sections_order = (_modalSkillData && _modalSkillData.sections || []).map(s => s.title);
+  const payload = { skill_id: skillId, fm_fields, sections_content: {..._editSkillSec}, sections_order, new_children: _instrNewChildren };
+  try {
+    const resp = await fetch('/api/save_skill', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    const data = await resp.json();
+    if (resp.ok && data.status === 'ok') { toast('✅ Skill 配置已保存: ' + skillId, 'c'); closeSkillModal(); }
+    else { toast('❌ 保存失败: ' + (data.error || ''), 'd'); }
+  } catch(e) { toast('❌ 网络错误: ' + e.message, 'd'); }
+  finally { btn.classList.remove('saving'); btn.innerHTML = '💾 保存到文件'; }
+}
+
+/* ── Create Skill ── */
+function openCreateSkillModal() {
+  document.getElementById('create-skill-modal').classList.add('open');
+  setTimeout(() => { const i = document.getElementById('create-skill-name'); if (i) { i.value = ''; i.focus(); } }, 60);
+}
+function closeCreateSkillModal() { document.getElementById('create-skill-modal').classList.remove('open'); }
+
+async function doCreateSkill() {
+  const nameInp = document.getElementById('create-skill-name');
+  const catInp  = document.getElementById('create-skill-category');
+  const raw     = (nameInp.value || '').trim();
+  const skillId = raw.toLowerCase().replace(/[^a-z0-9-]/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+  if (!skillId) { nameInp.focus(); nameInp.style.borderColor='var(--cr)'; setTimeout(()=>{nameInp.style.borderColor='';},1400); toast('请输入有效的 Skill 名称','d'); return; }
+  const category = (catInp ? catInp.value.trim() : '') || 'communication-driver';
+  const btn = document.getElementById('create-skill-btn');
+  btn.classList.add('saving'); btn.textContent = '⏳ 创建中...';
+  try {
+    const resp = await fetch('/api/create_skill', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ skill_name: skillId, category }) });
+    const data = await resp.json();
+    if (resp.ok) {
+      toast('✅ Skill 已创建: ' + (data.path || skillId), 'c');
+      closeCreateSkillModal();
+      switchTab('skills');
+      setTimeout(() => { const c = document.getElementById('card-skill-'+skillId); if(c){c.scrollIntoView({behavior:'smooth',block:'nearest'});c.classList.add('active-route');setTimeout(()=>c.classList.remove('active-route'),2200);} }, 600);
+    } else if (resp.status === 409) { toast('⚠️ Skill 已存在: ' + skillId, 'm');
+    } else { toast('❌ 创建失败: ' + (data.error || ''), 'd'); }
+  } catch(e) { toast('❌ 网络错误: ' + e.message, 'd'); }
+  finally { btn.classList.remove('saving'); btn.textContent = '✨ 创建 Skill'; }
+}
+
+/* ── Delete Skill ── */
+function openDeleteSkillModal(skillId, skillName) {
+  document.getElementById('del-skill-name').textContent = skillName;
+  document.getElementById('del-skill-path').textContent = 'skills/' + skillId + '/SKILL.md';
+  const modal = document.getElementById('delete-skill-modal');
+  modal.dataset.skillId = skillId;
+  modal.classList.add('open');
+}
+function closeDeleteSkillModal() { document.getElementById('delete-skill-modal').classList.remove('open'); }
+
+async function doDeleteSkill() {
+  const modal = document.getElementById('delete-skill-modal');
+  const skillId = modal.dataset.skillId;
+  if (!skillId) return;
+  const btn = document.getElementById('delete-skill-confirm-btn');
+  btn.classList.add('saving'); btn.textContent = '⏳ 删除中...';
+  try {
+    const resp = await fetch('/api/delete_skill', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ skill_id: skillId }) });
+    const data = await resp.json();
+    if (resp.ok) { toast('🗑️ Skill 已删除: skills/' + skillId, 'd'); closeDeleteSkillModal(); }
+    else { toast('❌ 删除失败: ' + (data.error || ''), 'd'); }
+  } catch(e) { toast('❌ 网络错误: ' + e.message, 'd'); }
+  finally { btn.classList.remove('saving'); btn.textContent = '🗑️ 确认删除'; }
+}
 
 /* ────────── Init ────────── */
 window.addEventListener('DOMContentLoaded', () => {
@@ -4479,5 +5783,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }, 8000);
 });
 </script>
+
 </body>
 </html>

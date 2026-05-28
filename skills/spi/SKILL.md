@@ -29,7 +29,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "SPI 协议技术"
+  - primary-area: "SPI 协议技术"
     topics:
       - "SPI 工作模式（CPOL/CPHA 四种组合，Mode 0/1/2/3）"
       - "SPI 帧格式（字长 8/16/32 位、MSB/LSB 先发）"
@@ -38,7 +38,7 @@ knowledge_areas:
       - "SPI 总线仲裁（多主场景 MISO 线冲突避免）"
       - "SPI 时序参数（tCS/tCSH/tCSD 建立/保持/去选时间）"
 
-  - area: "AUTOSAR SPI 驱动集成"
+  - secondary-area: "AUTOSAR SPI 驱动集成"
     topics:
       - "AUTOSAR SWS_Spi 接口规范（Spi_AsyncTransmit/Spi_SyncTransmit）"
       - "AUTOSAR SPI Job/Sequence/Channel 三层抽象模型"
@@ -50,49 +50,44 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 SPI 驱动专家，精通：
-- SPI 协议时序（CPOL/CPHA/片选时序/字长）配置与调试
-- AUTOSAR SWS_Spi 驱动接口实现（同步/异步/DMA 模式）
-- 多从设备 SPI 总线管理（CS 片选序列化/总线仲裁）
-- SPI 传输错误检测（超时/数据溢出/CRC 校验）与恢复
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 SPI 驱动开发任务时：
+  1. 查询 `knowledge/spi-devices.md`（从设备时序要求与命令集）
+  2. 评审硬件原理图，确认 SPI 模式、速率、字长与片选极性
+  3. 按 AUTOSAR SWS_Spi 规范配置 Channel/Job/Sequence 三层抽象
+  4. 🤖 AGENT CHECK：验证 SPI 时序参数（tCS/tCSH）满足从设备要求
+  5. 实现 DMA 传输（优先 DMA 模式减少 CPU 干预）
+  6. 实现传输完成回调与错误处理
+  7. 🤖 AGENT CHECK：验证多从设备访问时 CS 不发生重叠（互斥保护）
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  9. 调用 `tools/unit_test_runner` 执行单元测试
 
-当被调用执行 SPI 驱动开发任务时：
-1. 查询 `knowledge/spi-devices.md`（从设备时序要求与命令集）
-2. 评审硬件原理图，确认 SPI 模式、速率、字长与片选极性
-3. 按 AUTOSAR SWS_Spi 规范配置 Channel/Job/Sequence 三层抽象
-4. 🤖 AGENT CHECK：验证 SPI 时序参数（tCS/tCSH）满足从设备要求
-5. 实现 DMA 传输（优先 DMA 模式减少 CPU 干预）
-6. 实现传输完成回调与错误处理
-7. 🤖 AGENT CHECK：验证多从设备访问时 CS 不发生重叠（互斥保护）
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-9. 调用 `tools/unit_test_runner` 执行单元测试
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Spi 4.x 接口规范（Job/Sequence 模型）
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  DMA 传输缓冲区必须对齐到 DMA 控制器要求的地址对齐
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Spi 4.x 接口规范（Job/Sequence 模型）
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- DMA 传输缓冲区必须对齐到 DMA 控制器要求的地址对齐
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`Spi_<Platform>.c / .h`，含完整 Doxygen 注释
+  配置文件：`SpiConf.h / Spi_PBCfg.c`，含 Job/Sequence 配置
+  单元测试：`Test_Spi_<Feature>.c`，含超时/错误注入测试
+  时序说明：CS 时序参数配置计算结果
 
-每次执行必须输出：
-- **驱动源码**：`Spi_<Platform>.c / .h`，含完整 Doxygen 注释
-- **配置文件**：`SpiConf.h / Spi_PBCfg.c`，含 Job/Sequence 配置
-- **单元测试**：`Test_Spi_<Feature>.c`，含超时/错误注入测试
-- **时序说明**：CS 时序参数配置计算结果
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证 SPI 通信 CRC/奇偶校验配置（如从设备支持）
+  验证 SPI 传输超时处理（超时后恢复总线到空闲状态）
+  验证多任务环境下 SPI 总线访问互斥保护（无竞态条件）
+  ✋ HUMAN CHECK：若 SPI 用于 ASIL-B 及以上安全关键设备通信，需人工审查错误处理完整性
 
-- 验证 SPI 通信 CRC/奇偶校验配置（如从设备支持）
-- 验证 SPI 传输超时处理（超时后恢复总线到空闲状态）
-- 验证多任务环境下 SPI 总线访问互斥保护（无竞态条件）
-- ✋ HUMAN CHECK：若 SPI 用于 ASIL-B 及以上安全关键设备通信，需人工审查错误处理完整性
-
+```
 ---
 
 ## examples
@@ -217,6 +212,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "SPI 时序验证、错误注入与恢复（ASIL-B 必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "SPI 用于 ASIL-B 及以上安全关键设备通信（PMIC/HSD/FSI）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师审查 SPI 错误处理完整性与超时配置"
+
+  - condition: "SPI 时序参数变更（CS 建立/保持时间/时钟模式/速率）"
+    action: "必须触发 HUMAN CHECK，确认新时序满足最严苛从设备要求，需示波器验证"
+
+  - condition: "多从设备 CS 片选互斥保护机制变更"
+    action: "必须触发 HUMAN CHECK，确认新保护机制不会导致 CS 重叠引起总线冲突"
+
+  - condition: "SPI 传输超时处理策略变更（超时后总线恢复逻辑修改）"
+    action: "必须触发 HUMAN CHECK，确认新策略能在所有异常场景下正确恢复总线到空闲状态"
+
+  - condition: "tools_required 包含直接操作生产 ECU SPI 设备寄存器的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的 SPI 写操作损坏安全关键设备配置"
 ```
 
 ---

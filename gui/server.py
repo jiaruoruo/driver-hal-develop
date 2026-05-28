@@ -340,7 +340,8 @@ class ProjectParser:
         rules = []
         if not rules_dir.exists():
             return rules
-        for f in sorted(rules_dir.glob("*.md")):
+        # 使用 rglob 递归扫描所有子目录中的 .md 文件
+        for f in sorted(rules_dir.rglob("*.md")):
             rules.append({
                 "id": f.stem,
                 "name": self._humanize(f.stem),
@@ -358,8 +359,8 @@ class ProjectParser:
         if not knowledge_dir.exists():
             return knowledge
 
-        # 扫描 knowledge/ 根目录下的 .md 文件（跳过 README）
-        for f in sorted(knowledge_dir.glob("*.md")):
+        # 递归扫描 knowledge/ 下所有子目录的 .md 文件（跳过 README）
+        for f in sorted(knowledge_dir.rglob("*.md")):
             if f.name.lower() == "readme.md":
                 continue
             knowledge.append({
@@ -369,21 +370,6 @@ class ProjectParser:
                 "status": "active",
                 "last_modified": f.stat().st_mtime,
             })
-
-        # 扫描一级子目录中的 .md 文件
-        for subdir in sorted(knowledge_dir.iterdir()):
-            if not subdir.is_dir():
-                continue
-            for f in sorted(subdir.glob("*.md")):
-                if f.name.lower() == "readme.md":
-                    continue
-                knowledge.append({
-                    "id": f.stem,
-                    "name": self._humanize(f.stem),
-                    "path": str(f.relative_to(self.root)).replace("\\", "/"),
-                    "status": "active",
-                    "last_modified": f.stat().st_mtime,
-                })
 
         # 虚拟知识库条目（常用但尚未创建的文件，供 Add 下拉选择）
         virtual_knowledge = [
@@ -1179,6 +1165,474 @@ def api_delete_agent():
     })
     print(f"[DELETE] Agent deleted: agents/{agent_id}.md")
     return jsonify({"status": "ok", "agent_id": agent_id})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Skill CRUD APIs
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/skill_config/<skill_id>")
+def api_skill_config(skill_id):
+    """返回 Skill 完整配置（frontmatter + sections），供前端编辑弹窗使用。"""
+    skill_file = PROJECT_ROOT / "skills" / skill_id / "SKILL.md"
+    if not skill_file.exists():
+        return jsonify({"error": f"Skill not found: skills/{skill_id}/SKILL.md"}), 404
+    try:
+        content = skill_file.read_text(encoding="utf-8")
+    except Exception as e:
+        return jsonify({"error": f"读取文件失败: {e}"}), 500
+    fm_match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+    fm: dict = {}
+    if fm_match:
+        try:
+            fm = yaml.safe_load(fm_match.group(1)) or {}
+        except Exception:
+            fm = {}
+    sections = ProjectParser._parse_md_sections(content)
+    return jsonify({
+        "id": skill_id,
+        "name": fm.get("name", skill_id),
+        "frontmatter": fm,
+        "sections": sections,
+        "path": f"skills/{skill_id}/SKILL.md",
+    })
+
+
+@app.route("/api/save_skill", methods=["POST"])
+def api_save_skill():
+    """保存 Skill 配置到对应的 SKILL.md，并广播更新。"""
+    body = request.get_json(silent=True) or {}
+    skill_id = body.get("skill_id", "").strip()
+    if not skill_id:
+        return jsonify({"error": "skill_id is required"}), 400
+    skill_file = PROJECT_ROOT / "skills" / skill_id / "SKILL.md"
+    if not skill_file.exists():
+        return jsonify({"error": f"Skill file not found: skills/{skill_id}/SKILL.md"}), 404
+    try:
+        content = skill_file.read_text(encoding="utf-8")
+    except Exception as e:
+        return jsonify({"error": f"读取文件失败: {e}"}), 500
+
+    fm_fields = body.get("fm_fields", {})
+    sections_content = body.get("sections_content", {})
+    sections_order = body.get("sections_order", None)
+
+    # 更新 frontmatter
+    fm_match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+    fm: dict = {}
+    if fm_match:
+        try:
+            fm = yaml.safe_load(fm_match.group(1)) or {}
+        except Exception:
+            fm = {}
+    for field in ("version", "category", "subcategory", "domain", "description"):
+        if field in fm_fields and fm_fields[field]:
+            fm[field] = fm_fields[field]
+    if "use_cases" in fm_fields:
+        fm["use_cases"] = [u for u in fm_fields["use_cases"] if u]
+    if "automotive_standards" in fm_fields:
+        fm["automotive_standards"] = [s for s in fm_fields["automotive_standards"] if s]
+
+    # 重建 sections
+    orig_sections = ProjectParser._parse_md_sections(content)
+
+    def _apply(sections, updates):
+        for sec in sections:
+            if sec["title"] in updates:
+                sec["content"] = updates[sec["title"]]
+            for child in sec.get("children", []):
+                if child["title"] in updates:
+                    child["content"] = updates[child["title"]]
+        return sections
+
+    updated = _apply(orig_sections, sections_content)
+
+    # 处理前端新增的子节（如 instructions 下新增的 A/B/C/D 子节）
+    new_children = body.get("new_children", {})
+    for sec in updated:
+        if sec["title"] in new_children:
+            existing_child_titles = {c["title"] for c in sec.get("children", [])}
+            for ctitle in new_children[sec["title"]]:
+                if ctitle not in existing_child_titles and ctitle in sections_content:
+                    sec.setdefault("children", []).append({
+                        "title": ctitle,
+                        "content": sections_content[ctitle],
+                        "content_type": "markdown"
+                    })
+                    existing_child_titles.add(ctitle)
+
+    if sections_order is not None:
+        orig_map = {sec["title"]: sec for sec in updated}
+        new_secs = []
+        for title in sections_order:
+            if title in orig_map:
+                new_secs.append(orig_map[title])
+            elif title in sections_content:
+                new_secs.append({"title": title, "content": sections_content[title], "content_type": "yaml", "children": []})
+        updated = new_secs
+    else:
+        existing = {sec["title"] for sec in orig_sections}
+        for c in [ch for sec in orig_sections for ch in sec.get("children", [])]:
+            existing.add(c["title"])
+        for title, sc in sections_content.items():
+            if title not in existing:
+                updated.append({"title": title, "content": sc, "content_type": "yaml", "children": []})
+
+    new_fm_str = yaml.dump(fm, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    new_content = f"---\n{new_fm_str}---\n"
+    for sec in updated:
+        new_content += f"\n## {sec['title']}\n\n"
+        if sec.get("children"):
+            if sec["content"]:
+                new_content += f"{sec['content']}\n\n"
+            for child in sec["children"]:
+                new_content += f"### {child['title']}\n\n"
+                if child.get("content"):
+                    new_content += f"{child['content']}\n\n"
+                new_content += "---\n"
+        else:
+            c = sec.get("content", "")
+            if sec.get("content_type") == "yaml":
+                new_content += f"```yaml\n{c}\n```\n\n"
+            else:
+                if c:
+                    new_content += f"{c}\n\n"
+            new_content += "---\n"
+
+    try:
+        skill_file.write_text(new_content, encoding="utf-8")
+    except Exception as e:
+        return jsonify({"error": f"写入文件失败: {e}"}), 500
+
+    all_data = parser.parse_all()
+    socketio.emit("project_update", {"type": "modified", "changed_file": f"skills/{skill_id}/SKILL.md", "data": all_data, "timestamp": time.time()})
+    print(f"[SAVE] Skill config saved: skills/{skill_id}/SKILL.md")
+    return jsonify({"status": "ok", "skill_id": skill_id})
+
+
+@app.route("/api/create_skill", methods=["POST"])
+def api_create_skill():
+    """创建新 Skill 目录和 SKILL.md 模板文件。"""
+    body = request.get_json(silent=True) or {}
+    raw_name = body.get("skill_name", "").strip()
+    if not raw_name:
+        return jsonify({"error": "skill_name is required"}), 400
+    import re as _re
+    skill_id = _re.sub(r"[^a-z0-9-]", "-", raw_name.lower())
+    skill_id = _re.sub(r"-+", "-", skill_id).strip("-")
+    if not skill_id:
+        return jsonify({"error": "skill_name is invalid (use lowercase letters, digits and hyphens)"}), 400
+    category = body.get("category", "communication-driver")
+    skill_dir = PROJECT_ROOT / "skills" / skill_id
+    if skill_dir.exists():
+        return jsonify({"error": f"Skill already exists: skills/{skill_id}"}), 409
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_file = skill_dir / "SKILL.md"
+    display_name = skill_id.replace("-", " ").title()
+    import datetime as _dt
+    today = _dt.date.today().strftime("%Y-%m-%d")
+
+    # ── 优先从 skills/tlf35584/SKILL.md 读取模板（tlf35584 作为格式标准参考）────
+    default_content = None
+    _tpl_file = PROJECT_ROOT / "skills" / "tlf35584" / "SKILL.md"
+    if _tpl_file.exists():
+        try:
+            _tpl_text = _tpl_file.read_text(encoding="utf-8")
+            # 定位 front matter 结束位置
+            _fm_m = _re.match(r"^---\n.*?\n---\n?", _tpl_text, _re.DOTALL)
+            if _fm_m:
+                _body = _tpl_text[_fm_m.end():]
+                _pascal = display_name.replace(" ", "")        # e.g. CanDriver
+                _abbr   = skill_id.replace("-", "_").upper()   # e.g. CAN_DRIVER
+                # 构造新 skill 专属 front matter（保留 tlf35584 的字段结构）
+                _new_fm = (
+                    "---\n"
+                    f"name: {skill_id}\n"
+                    "version: \"1.0.0\"\n"
+                    f"category: {category}\n"
+                    "domain: automotive\n"
+                    f"subcategory: {skill_id}\n"
+                    "\ndescription: >\n"
+                    f"  专注于 {display_name} 驱动开发，覆盖初始化配置、数据收发、\n"
+                    "  故障检测与保护机制，确保满足 AUTOSAR 规范与 ISO 26262 功能安全要求。\n"
+                    "\nuse_cases:\n"
+                    f"  - \"初始化 {display_name} 并完成基础配置\"\n"
+                    f"  - \"配置 {display_name} 输出参数与工作模式\"\n"
+                    f"  - \"配置 {display_name} 监控通道阈值及故障响应策略\"\n"
+                    f"  - \"实现 {display_name} 安全状态机转换逻辑\"\n"
+                    f"  - \"读取 {display_name} 故障诊断寄存器并上报 Dem 故障事件\"\n"
+                    "\nautomotive_standards:\n"
+                    "  - \"ISO 26262 (Functional Safety)\"\n"
+                    "  - \"AUTOSAR Classic 4.x\"\n"
+                    "  - \"ASPICE Level 3\"\n"
+                    "  - \"MISRA-C:2012\"\n"
+                    "---\n"
+                )
+                # 替换 body 中各大小写变体（复合词先替换，避免局部匹配污染）
+                _body = _body.replace("Tlf35584Drv",           f"{_pascal}Drv")
+                _body = _body.replace("Tlf35584_",             f"{_pascal}_")
+                _body = _body.replace("Test_Tlf35584",         f"Test_{_pascal}")
+                _body = _body.replace("SchM_Enter_Tlf35584",   f"SchM_Enter_{_pascal}")
+                _body = _body.replace("SPI_SEQ_TLF35584",      f"SPI_SEQ_{_abbr}")
+                _body = _body.replace("TLF35584",              _abbr)
+                _body = _body.replace("Tlf35584",              _pascal)
+                _body = _body.replace("tlf35584",              skill_id)
+                # 更新 metadata 字段
+                _body = _re.sub(r'last_updated: "[\d-]+"',     f'last_updated: "{today}"', _body)
+                _body = _body.replace('maturity: "beta"',       'maturity: "draft"')
+                _body = _body.replace('complexity: "expert"',   'complexity: "intermediate"')
+                # 替换 tags 块（保留通用汽车 tags，移除芯片专属 tags）
+                _body = _re.sub(
+                    r"tags:\n(?:  - .*\n)+",
+                    f"tags:\n  - automotive\n  - {skill_id}\n  - iso26262\n  - autosar\n  - misra\n",
+                    _body
+                )
+                default_content = _new_fm + _body
+                print(f"[CREATE] 使用模板文件生成: {_tpl_file.name}")
+        except Exception as _e:
+            print(f"[WARN] 从模板文件构建 Skill 失败: {_e}，使用内置模板")
+
+    # ── 内置模板（fallback，当模板文件不存在或解析失败时使用） ────────────────
+    if default_content is None:
+        default_content = (
+            "---\n"
+            f"name: {skill_id}\n"
+        "version: \"1.0.0\"\n"
+        f"category: {category}\n"
+        "domain: automotive\n"
+        f"subcategory: {skill_id}\n"
+        "\ndescription: >\n"
+        f"  专注于 {display_name} 驱动开发，覆盖初始化配置、数据收发、\n"
+        "  故障检测与保护机制，确保满足 AUTOSAR 规范与 ISO 26262 功能安全要求。\n"
+        "\nuse_cases:\n"
+        f"  - \"初始化 {display_name} 并完成基础配置\"\n"
+        f"  - \"实现 {display_name} 数据读写接口\"\n"
+        f"  - \"实现 {display_name} 故障检测与保护逻辑\"\n"
+        f"  - \"生成符合 AUTOSAR 规范的 {display_name} 驱动源码\"\n"
+        "\nautomotive_standards:\n"
+        "  - \"ISO 26262 (Functional Safety)\"\n"
+        "  - \"AUTOSAR Classic 4.x\"\n"
+        "  - \"ASPICE Level 3\"\n"
+        "  - \"MISRA-C:2012\"\n"
+        "---\n"
+        "\n## knowledge_areas\n\n"
+        "```yaml\n"
+        "knowledge_areas:\n"
+        f"  - primary-area: \"{display_name} 技术\"\n"
+        "    topics:\n"
+        f"      - \"{display_name} 工作原理与架构\"\n"
+        f"      - \"{display_name} 寄存器/接口规范\"\n"
+        f"      - \"{display_name} 初始化序列与配置参数\"\n"
+        f"      - \"{display_name} 故障检测与保护机制\"\n"
+        "\n"
+        "  - secondary-area: \"AUTOSAR MCAL 集成\"\n"
+        "    topics:\n"
+        "      - \"AUTOSAR 相关 SWS 接口规范\"\n"
+        "      - \"MCAL 配置工具使用（EB tresos/DaVinci）\"\n"
+        "      - \"MISRA-C:2012 合规编码要求\"\n"
+        "```\n\n---\n"
+        "\n## instructions\n\n"
+        f"### A. Core Competencies（能力声明）\n\n"
+        f"你是一名 {display_name} 专家，精通：\n"
+        f"- {display_name} 寄存器级驱动实现\n"
+        "- AUTOSAR MCAL 驱动集成与配置\n"
+        "- 故障检测状态机与保护动作实现\n"
+        "- MISRA-C:2012 合规代码开发\n\n"
+        "### B. Approach（执行步骤）\n\n"
+        f"当被调用执行 {display_name} 驱动开发任务时：\n"
+        f"1. 查询相关知识库文档（芯片手册/接口规范）\n"
+        "2. 评审硬件原理图，确认接口参数\n"
+        "3. 按 AUTOSAR 规范实现初始化与控制 API\n"
+        "4. 🤖 AGENT CHECK：验证接口时序与参数正确性\n"
+        "5. 实现故障检测状态机，确保每个故障模式均有对应处理动作\n"
+        "6. 🤖 AGENT CHECK：验证所有保护逻辑满足安全等级要求\n"
+        "7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查\n"
+        "8. 调用 `tools/unit_test_runner` 执行单元测试，验证覆盖率达标\n\n"
+        "### C. Standards & Best Practices（规范遵循）\n\n"
+        "- 遵循 `rules/coding-rules.md`（编码规范）\n"
+        "- 遵循 AUTOSAR 相关 SWS 接口规范\n"
+        "- 遵循 MISRA-C:2012 全规则集（零未批准违规）\n"
+        "- ASIL-B 及以上：强制 peer review，关键路径必须有测试覆盖\n\n"
+        "### D. Deliverables（交付物定义）\n\n"
+        "每次执行必须输出：\n"
+        f"- **驱动源码**：`{display_name.replace(' ','')}_Drv.c / .h`，含完整 Doxygen 注释\n"
+        f"- **配置文件**：`{display_name.replace(' ','')}_Cfg.h`，含编译开关与阈值参数宏\n"
+        "- **单元测试**：`Test_<Feature>.c`，基于 Unity/ceedling 框架\n"
+        "- **评审清单**：MISRA 合规报告 + 故障路径覆盖矩阵\n\n"
+        "### E. Safety & Security Considerations（安全合规检查）\n\n"
+        "- 验证通信失败时驱动进入安全状态\n"
+        "- 验证边界条件的安全处理逻辑\n"
+        f"- ✋ HUMAN CHECK：若驱动用于 ASIL-C/D 安全关键功能，需人工审查保护逻辑\n\n"
+        "---\n"
+        "\n## examples\n\n"
+        "```yaml\n"
+        "examples:\n"
+        f"  - prompt: \"为 {display_name} 实现初始化驱动\"\n"
+        "    response: |\n"
+        "      ## 分析说明\n"
+        f"      {display_name} 初始化流程：配置接口参数 → 上电序列 → 验证器件 ID → 完成初始化。\n"
+        "      \n"
+        "      ## 代码片段\n"
+        "      ```c\n"
+        f"      /* {display_name.replace(' ','')}_Drv.h */\n"
+        f"      Std_ReturnType {display_name.replace(' ','')}_Init(\n"
+        f"          const {display_name.replace(' ','')}_ConfigType* ConfigPtr\n"
+        "      );\n"
+        "      ```\n"
+        "      \n"
+        "      ## 检查结论\n"
+        "      - MISRA-C:2012 合规\n"
+        "      - 边界检查：NULL 指针保护\n"
+        "      - 故障保护：初始化失败返回 E_NOT_OK\n"
+        "```\n\n---\n"
+        "\n## constraints\n\n"
+        "```yaml\n"
+        "constraints:\n"
+        "  - \"标准合规：所有生成代码必须符合 MISRA-C:2012，零未批准违规\"\n"
+        "  - \"安全等级：ASIL-B 及以上驱动变更必须触发 HUMAN CHECK 并进行独立评审\"\n"
+        "  - \"实时性：驱动操作延迟须满足系统实时性要求\"\n"
+        "  - \"内存：驱动模块 RAM 占用须在合理范围内\"\n"
+        "```\n\n---\n"
+        "\n## tools_required\n\n"
+        "```yaml\n"
+        "tools_required:\n"
+        "  - \"tools/static_analyzer    # MISRA-C:2012 静态检查\"\n"
+        "  - \"tools/unit_test_runner   # 单元测试执行与覆盖率报告\"\n"
+        "  - \"tools/code_generator     # AUTOSAR 驱动框架代码生成\"\n"
+        "```\n\n---\n"
+        "\n## related_skills\n\n"
+        "```yaml\n"
+        "related_skills:\n"
+        "  - skill: \"mcu\"\n"
+        "    relationship: \"complementary\"\n"
+        "  - skill: \"safetypack\"\n"
+        "    relationship: \"complementary\"\n"
+        "```\n\n---\n"
+        "\n## integration_points\n\n"
+        "```yaml\n"
+        "integration_points:\n"
+        f"  - system: \"车规 ECU（{display_name} 应用场景）\"\n"
+        "    interface: \"待填写接口类型\"\n"
+        "    protocol: \"待填写 AUTOSAR 接口规范\"\n"
+        "  - system: \"故障管理模块（DEM）\"\n"
+        "    interface: \"软件接口\"\n"
+        "    protocol: \"AUTOSAR Dem_ReportErrorStatus API\"\n"
+        "```\n\n---\n"
+        "\n## performance_criteria\n\n"
+        "```yaml\n"
+        "performance_criteria:\n"
+        "  - metric: \"执行时间\"\n"
+        f"    target: \"< 30 分钟完成 {display_name} 标准初始化模块开发\"\n"
+        "  - metric: \"首次质量\"\n"
+        "    target: \"> 95% 生成代码通过 MISRA static_analyzer 检查\"\n"
+        "  - metric: \"标准合规性\"\n"
+        "    target: \"100% MISRA-C:2012 合规（零未批准违规）\"\n"
+        "```\n\n---\n"
+        "\n## validation\n\n"
+        "```yaml\n"
+        "validation:\n"
+        "  - method: \"单元测试\"\n"
+        "    coverage: \"语句覆盖 ≥ 95%，MC/DC ≥ 90%（ASIL-B/C/D）\"\n"
+        "  - method: \"静态分析\"\n"
+        "    scope: \"MISRA-C:2012 全规则集\"\n"
+        "  - method: \"HIL/SIL 验证\"\n"
+        "    requirements: \"故障注入触发验证（ASIL-B 及以上必填）\"\n"
+        "```\n\n---\n"
+        "\n## metadata\n\n"
+        "```yaml\n"
+        "metadata:\n"
+        "  author: \"Driver HAL Team\"\n"
+        f"  last_updated: \"{today}\"\n"
+        "  maturity: \"draft\"\n"
+        "  complexity: \"intermediate\"\n"
+        "  estimated_time: \"20-40 分钟\"\n"
+        "\n"
+        "tags:\n"
+        "  - automotive\n"
+        f"  - {skill_id}\n"
+        "  - iso26262\n"
+        "  - autosar\n"
+        "  - misra\n"
+        "```\n"
+    )
+    try:
+        skill_file.write_text(default_content, encoding="utf-8")
+    except Exception as e:
+        return jsonify({"error": f"创建文件失败: {e}"}), 500
+    all_data = parser.parse_all()
+    socketio.emit("project_update", {"type": "created", "changed_file": f"skills/{skill_id}/SKILL.md", "data": all_data, "timestamp": time.time()})
+    print(f"[CREATE] Skill created: skills/{skill_id}/SKILL.md")
+    return jsonify({"status": "ok", "skill_id": skill_id, "path": f"skills/{skill_id}/SKILL.md"})
+
+
+@app.route("/api/delete_skill", methods=["POST"])
+def api_delete_skill():
+    """删除指定 Skill 目录，并广播更新。"""
+    import shutil
+    body = request.get_json(silent=True) or {}
+    skill_id = body.get("skill_id", "").strip()
+    if not skill_id:
+        return jsonify({"error": "skill_id is required"}), 400
+    skill_dir = PROJECT_ROOT / "skills" / skill_id
+    if not skill_dir.exists():
+        return jsonify({"error": f"Skill not found: skills/{skill_id}"}), 404
+    try:
+        shutil.rmtree(skill_dir)
+    except Exception as e:
+        return jsonify({"error": f"删除失败: {e}"}), 500
+    all_data = parser.parse_all()
+    socketio.emit("project_update", {"type": "deleted", "changed_file": f"skills/{skill_id}/SKILL.md", "data": all_data, "timestamp": time.time()})
+    print(f"[DELETE] Skill deleted: skills/{skill_id}")
+    return jsonify({"status": "ok", "skill_id": skill_id})
+
+
+@app.route("/api/list_rules")
+def api_list_rules():
+    """递归列出 rules/ 目录下所有 .md 文件路径（供前端规范文件下拉使用）。"""
+    rules_dir = PROJECT_ROOT / "rules"
+    paths = []
+    if rules_dir.exists():
+        for f in sorted(rules_dir.rglob("*.md")):
+            paths.append(str(f.relative_to(PROJECT_ROOT)).replace("\\", "/"))
+    return jsonify({"paths": paths})
+
+
+@app.route("/api/list_knowledge")
+def api_list_knowledge():
+    """递归列出 knowledge/ 目录下所有 .md 文件路径（跳过 README）。"""
+    kn_dir = PROJECT_ROOT / "knowledge"
+    paths = []
+    if kn_dir.exists():
+        for f in sorted(kn_dir.rglob("*.md")):
+            if f.name.lower() != "readme.md":
+                paths.append(str(f.relative_to(PROJECT_ROOT)).replace("\\", "/"))
+    return jsonify({"paths": paths})
+
+
+@app.route("/api/list_tools")
+def api_list_tools():
+    """列出 tools/ 目录下所有工具文件的相对路径（供前端工具路径下拉选择使用）。"""
+    tools_dir = PROJECT_ROOT / "tools"
+    paths = []
+    if tools_dir.exists():
+        for tool_file in sorted(tools_dir.iterdir()):
+            if tool_file.is_file() and tool_file.suffix in ('.py', '.js', '.sh', '.bat'):
+                paths.append(f"tools/{tool_file.name}")
+    return jsonify({"paths": paths})
+
+
+@app.route("/api/list_skills")
+def api_list_skills():
+    """列出所有 skills/*/SKILL.md 的相对路径（供前端关联 Skill 下拉选择使用）。"""
+    skills_dir = PROJECT_ROOT / "skills"
+    paths = []
+    if skills_dir.exists():
+        for skill_dir in sorted(skills_dir.iterdir()):
+            if skill_dir.is_dir():
+                skill_file = skill_dir / "SKILL.md"
+                if skill_file.exists():
+                    paths.append(f"skills/{skill_dir.name}/SKILL.md")
+    return jsonify({"paths": paths})
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "Safety Pack 安全监控技术"
+  - primary-area: "Safety Pack 安全监控技术"
     topics:
       - "Safety Pack 架构（安全监控核心/故障反应函数/安全状态机）"
       - "监控窗口机制（时间窗口触发/计数窗口触发/窗口参数配置）"
@@ -37,7 +37,7 @@ knowledge_areas:
       - "Safety Pack 诊断接口（状态查询/故障历史记录）"
       - "Safety Pack 初始化序列与自检（Power-On Self Test）"
 
-  - area: "ISO 26262 安全机制设计"
+  - secondary-area: "ISO 26262 安全机制设计"
     topics:
       - "ASIL-D 安全机制要求（独立性/多样性/监控覆盖度）"
       - "安全状态定义（安全目标达成的系统降级状态）"
@@ -49,50 +49,45 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 Safety Pack 集成专家，精通：
-- Safety Pack 安全监控框架配置与集成
-- ASIL-D 故障反应函数设计（立即响应/延迟响应/分级响应）
-- Safety Pack 与 FSI/WDG/PMIC 的安全联动配置
-- 安全状态机转换逻辑（Normal → Degraded → SafeState）
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 Safety Pack 集成任务时：
+  1. 查询 `knowledge/safetypack-api.md`（Safety Pack API 与配置规范）
+  2. 评审安全需求规格（SRS）与 FMEA 分析，确认监控项目清单
+  3. 配置安全监控窗口（时间窗口周期/容差/计数阈值）
+  4. 🤖 AGENT CHECK：验证所有 FMEA 识别的故障模式均有对应监控窗口
+  5. 实现故障反应函数（回调实现/安全状态转换逻辑）
+  6. 集成 FSI 接口触发与 PMIC WDG 联动
+  7. 🤖 AGENT CHECK：验证安全状态不可绕过直接返回到正常状态
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查（零豁免）
+  9. 调用 `tools/unit_test_runner` 执行单元测试（100% MC/DC）
 
-当被调用执行 Safety Pack 集成任务时：
-1. 查询 `knowledge/safetypack-api.md`（Safety Pack API 与配置规范）
-2. 评审安全需求规格（SRS）与 FMEA 分析，确认监控项目清单
-3. 配置安全监控窗口（时间窗口周期/容差/计数阈值）
-4. 🤖 AGENT CHECK：验证所有 FMEA 识别的故障模式均有对应监控窗口
-5. 实现故障反应函数（回调实现/安全状态转换逻辑）
-6. 集成 FSI 接口触发与 PMIC WDG 联动
-7. 🤖 AGENT CHECK：验证安全状态不可绕过直接返回到正常状态
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查（零豁免）
-9. 调用 `tools/unit_test_runner` 执行单元测试（100% MC/DC）
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 ISO 26262 Part 6 软件安全开发流程（ASIL-D）
+  遵循 MISRA-C:2012 全规则集（安全关键代码**零豁免**）
+  Safety Pack 集成代码必须 100% MC/DC 覆盖率
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 ISO 26262 Part 6 软件安全开发流程（ASIL-D）
-- 遵循 MISRA-C:2012 全规则集（安全关键代码**零豁免**）
-- Safety Pack 集成代码必须 100% MC/DC 覆盖率
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  集成源码：`SafetyPack_Integration.c / .h`，含安全注释
+  配置文件：`SafetyPack_Cfg.h`，含监控窗口时间与阈值参数
+  故障反应函数：`SafetyPack_Callbacks.c`，含分级响应实现
+  单元测试：`Test_SafetyPack_<Feature>.c`，100% MC/DC 覆盖
+  安全覆盖矩阵：监控项目 → FMEA 故障模式 → 反应函数
 
-每次执行必须输出：
-- **集成源码**：`SafetyPack_Integration.c / .h`，含安全注释
-- **配置文件**：`SafetyPack_Cfg.h`，含监控窗口时间与阈值参数
-- **故障反应函数**：`SafetyPack_Callbacks.c`，含分级响应实现
-- **单元测试**：`Test_SafetyPack_<Feature>.c`，100% MC/DC 覆盖
-- **安全覆盖矩阵**：监控项目 → FMEA 故障模式 → 反应函数
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证所有 FMEA 故障模式均有对应监控窗口（无遗漏）
+  验证故障反应函数执行时间满足安全响应时间要求
+  验证安全状态转换的不可逆性（需重新上电才能恢复）
+  ✋ HUMAN CHECK：所有 Safety Pack ASIL-D 配置变更必须功能安全工程师确认
 
-- 验证所有 FMEA 故障模式均有对应监控窗口（无遗漏）
-- 验证故障反应函数执行时间满足安全响应时间要求
-- 验证安全状态转换的不可逆性（需重新上电才能恢复）
-- ✋ HUMAN CHECK：所有 Safety Pack ASIL-D 配置变更必须功能安全工程师确认
-
+```
 ---
 
 ## examples
@@ -218,6 +213,31 @@ validation:
     requirements: "所有监控窗口超时场景 100% 验证"
   - method: "HIL/SIL 验证"
     requirements: "端到端安全状态转换验证（ASIL-D 必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "Safety Pack 监控窗口时间参数变更（周期/容差/故障阈值）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认新参数满足系统 ASIL-D 安全响应时间要求"
+
+  - condition: "故障反应函数逻辑变更（安全状态转换条件或响应动作修改）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认新故障反应满足安全目标要求"
+
+  - condition: "Safety Pack 与 FSI/WDG/PMIC 联动逻辑变更"
+    action: "必须触发 HUMAN CHECK，确认联动变更不会导致安全机制失效或误触发"
+
+  - condition: "安全状态不可逆性约束变更（允许从安全状态自动恢复的条件修改）"
+    action: "必须触发 HUMAN CHECK，确认新策略不会绕过安全状态恢复到正常运行模式"
+
+  - condition: "Safety Pack 驱动被定义为 ASIL-D 安全机制的唯一实现路径，无独立评审"
+    action: "拒绝执行，必须触发 HUMAN CHECK，要求增加独立功能安全评审流程"
+
+  - condition: "tools_required 包含直接写入生产 ECU Safety Pack 配置寄存器的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的 Safety Pack 配置进入生产环境"
 ```
 
 ---

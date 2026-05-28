@@ -81,6 +81,8 @@ workflows:
 skills:
   - skill: mcu
     proficiency: intermediate
+  - skill: bridge-driver
+    proficiency: advanced
 ```
 
 ---

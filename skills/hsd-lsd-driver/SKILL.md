@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "HSD/LSD 驱动芯片技术"
+  - primary-area: "HSD/LSD 驱动芯片技术"
     topics:
       - "HSD 高边驱动原理（P-channel MOSFET/Smart FET 拓扑）"
       - "LSD 低边驱动原理（N-channel MOSFET 拓扑）"
@@ -37,7 +37,7 @@ knowledge_areas:
       - "过流/短路/过温/开路故障检测电路原理与诊断寄存器"
       - "PWM 负载调光控制时序与占空比精度要求"
 
-  - area: "AUTOSAR MCAL 集成"
+  - secondary-area: "AUTOSAR MCAL 集成"
     topics:
       - "AUTOSAR SWS_Dio 接口规范（Dio_WriteChannel/Dio_ReadChannel）"
       - "AUTOSAR SWS_Spi 接口规范（SPI 诊断读写）"
@@ -49,49 +49,44 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 HSD/LSD 驱动芯片专家，精通：
-- HSD/LSD 驱动芯片（BTS7xxx/TLE72xx/MC33xxx）寄存器级驱动实现
-- SPI 诊断接口实现与故障寄存器位字段解析
-- 负载控制接口（On/Off/PWM 调光）与电流反馈采样
-- 过流/短路/开路故障检测状态机与保护动作实现
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 HSD/LSD 驱动开发任务时：
+  1. 查询 `knowledge/hsd-lsd-chips.md`（芯片寄存器定义与故障诊断位）
+  2. 评审硬件原理图，确认 SPI 接口参数与负载类型（电阻/电感/灯）
+  3. 实现 SPI 诊断读写接口（标准 SPI 命令帧格式）
+  4. 🤖 AGENT CHECK：验证 SPI 帧奇偶校验（BTS7xxx 需要奇校验）
+  5. 实现负载控制接口（On/Off/PWM）与 IS 引脚 ADC 采样
+  6. 实现故障寄存器轮询与故障状态机（Normal/Fault/SafeState）
+  7. 🤖 AGENT CHECK：验证所有故障类型均映射到对应 DEM 事件
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  9. 调用 `tools/unit_test_runner` 执行单元测试
 
-当被调用执行 HSD/LSD 驱动开发任务时：
-1. 查询 `knowledge/hsd-lsd-chips.md`（芯片寄存器定义与故障诊断位）
-2. 评审硬件原理图，确认 SPI 接口参数与负载类型（电阻/电感/灯）
-3. 实现 SPI 诊断读写接口（标准 SPI 命令帧格式）
-4. 🤖 AGENT CHECK：验证 SPI 帧奇偶校验（BTS7xxx 需要奇校验）
-5. 实现负载控制接口（On/Off/PWM）与 IS 引脚 ADC 采样
-6. 实现故障寄存器轮询与故障状态机（Normal/Fault/SafeState）
-7. 🤖 AGENT CHECK：验证所有故障类型均映射到对应 DEM 事件
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-9. 调用 `tools/unit_test_runner` 执行单元测试
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Dio / SWS_Spi / SWS_Pwm 接口规范
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  故障检测时间需满足应用层对诊断响应时间的要求
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Dio / SWS_Spi / SWS_Pwm 接口规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- 故障检测时间需满足应用层对诊断响应时间的要求
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`HsdLsdDrv_<ChipName>.c / .h`，含完整 Doxygen 注释
+  配置文件：`HsdLsdDrv_Cfg.h`，含通道映射与故障阈值配置
+  单元测试：`Test_HsdLsdDrv_<Feature>.c`，含故障注入测试用例
+  故障覆盖矩阵：故障类型 → 检测机制 → DEM 事件 对应关系表
 
-每次执行必须输出：
-- **驱动源码**：`HsdLsdDrv_<ChipName>.c / .h`，含完整 Doxygen 注释
-- **配置文件**：`HsdLsdDrv_Cfg.h`，含通道映射与故障阈值配置
-- **单元测试**：`Test_HsdLsdDrv_<Feature>.c`，含故障注入测试用例
-- **故障覆盖矩阵**：故障类型 → 检测机制 → DEM 事件 对应关系表
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证过流/短路故障检测时间满足 ASIL 等级要求
+  验证 SPI 通信失败时驱动进入安全状态（关闭负载输出）
+  验证 IS 引脚采样异常时的诊断处理路径
+  ✋ HUMAN CHECK：若 HSD/LSD 控制 ASIL-C/D 安全关键执行器，需人工审查保护逻辑
 
-- 验证过流/短路故障检测时间满足 ASIL 等级要求
-- 验证 SPI 通信失败时驱动进入安全状态（关闭负载输出）
-- 验证 IS 引脚采样异常时的诊断处理路径
-- ✋ HUMAN CHECK：若 HSD/LSD 控制 ASIL-C/D 安全关键执行器，需人工审查保护逻辑
-
+```
 ---
 
 ## examples
@@ -218,6 +213,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "短路/过流/开路故障注入触发验证（ASIL-B 及以上必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "HSD/LSD 控制 ASIL-C/D 安全关键执行器（制动灯/转向信号/安全阀门）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师审查保护逻辑与故障检测响应时间"
+
+  - condition: "过流/短路/开路故障检测阈值变更"
+    action: "必须触发 HUMAN CHECK，确认新阈值在最坏工况下仍能正确检测故障而不误报"
+
+  - condition: "故障检测到保护动作（关闭负载输出）的响应时序变更"
+    action: "必须触发 HUMAN CHECK，确认新响应时序满足安全目标规定的最大容错时间"
+
+  - condition: "IS 电流反馈采样逻辑变更（限流保护参数修改）"
+    action: "必须触发 HUMAN CHECK，确认新限流阈值与负载规格和 ASIL 安全要求一致"
+
+  - condition: "tools_required 包含直接控制生产 ECU HSD/LSD 输出引脚的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的负载控制操作损坏执行器或引发安全事件"
 ```
 
 ---

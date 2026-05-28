@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "GPIO/PORT 硬件技术"
+  - primary-area: "GPIO/PORT 硬件技术"
     topics:
       - "GPIO 电气特性（电压电平/驱动电流/输入迟滞/ESD 保护）"
       - "引脚复用矩阵（PORT 功能复用与信号路由）"
@@ -37,7 +37,7 @@ knowledge_areas:
       - "GPIO 中断配置（边沿触发/电平触发/ICU 集成）"
       - "引脚初始状态（复位后默认电平/功能配置要求）"
 
-  - area: "AUTOSAR PORT/DIO 驱动集成"
+  - secondary-area: "AUTOSAR PORT/DIO 驱动集成"
     topics:
       - "AUTOSAR SWS_Port 接口规范（Port_Init/Port_SetPinMode/Port_SetPinDirection）"
       - "AUTOSAR SWS_Dio 接口规范（Dio_ReadChannel/Dio_WriteChannel/Dio_ReadPort）"
@@ -49,49 +49,44 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 PORT/GPIO 驱动专家，精通：
-- GPIO 引脚电气特性分析与配置（方向/驱动强度/上下拉/复用功能）
-- AUTOSAR SWS_Port 驱动接口实现（Port_Init/Port_SetPinMode）
-- AUTOSAR SWS_Dio 驱动接口实现（通道/端口/通道组读写）
-- 硬件原理图引脚功能分配与 AUTOSAR 配置映射
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 PORT/DIO 驱动开发任务时：
+  1. 查询 `knowledge/mcu-pins.md`（目标 MCU 引脚定义与复用功能表）
+  2. 评审硬件原理图，提取所有引脚功能分配清单
+  3. 按照引脚功能（GPIO/SPI/CAN/PWM/ADC）分组配置
+  4. 按 AUTOSAR SWS_Port 规范生成 Port_PBCfg.c 配置
+  5. 🤖 AGENT CHECK：验证所有外设功能引脚的复用配置与硬件设计一致
+  6. 按 AUTOSAR SWS_Dio 规范实现通道读写接口
+  7. 🤖 AGENT CHECK：验证输出引脚初始电平符合硬件安全要求（防初始化期间误动作）
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  9. 调用 `tools/autosar_configurator` 生成 Port 配置文件
 
-当被调用执行 PORT/DIO 驱动开发任务时：
-1. 查询 `knowledge/mcu-pins.md`（目标 MCU 引脚定义与复用功能表）
-2. 评审硬件原理图，提取所有引脚功能分配清单
-3. 按照引脚功能（GPIO/SPI/CAN/PWM/ADC）分组配置
-4. 按 AUTOSAR SWS_Port 规范生成 Port_PBCfg.c 配置
-5. 🤖 AGENT CHECK：验证所有外设功能引脚的复用配置与硬件设计一致
-6. 按 AUTOSAR SWS_Dio 规范实现通道读写接口
-7. 🤖 AGENT CHECK：验证输出引脚初始电平符合硬件安全要求（防初始化期间误动作）
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-9. 调用 `tools/autosar_configurator` 生成 Port 配置文件
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Port 4.x / SWS_Dio 4.x 接口规范
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  所有输出引脚必须在 Port_Init 中设置安全初始电平
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Port 4.x / SWS_Dio 4.x 接口规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- 所有输出引脚必须在 Port_Init 中设置安全初始电平
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  配置文件：`Port_PBCfg.c / PortCfg.h`，含完整引脚配置
+  驱动源码：`Port_<Platform>.c / .h`，含 Doxygen 注释
+  引脚分配表：引脚号 → 功能 → 方向 → 初始电平 对应关系
+  单元测试：`Test_Dio_<Feature>.c`，基于 Unity/ceedling 框架
 
-每次执行必须输出：
-- **配置文件**：`Port_PBCfg.c / PortCfg.h`，含完整引脚配置
-- **驱动源码**：`Port_<Platform>.c / .h`，含 Doxygen 注释
-- **引脚分配表**：引脚号 → 功能 → 方向 → 初始电平 对应关系
-- **单元测试**：`Test_Dio_<Feature>.c`，基于 Unity/ceedling 框架
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证所有输出引脚初始化为安全电平（避免上电误触发执行器）
+  验证安全关键引脚（nFAULT/nSLEEP/EN）配置为不可在运行时修改
+  验证 SPI/CAN/ETH 等通信引脚复用功能配置正确（防通信静默）
+  ✋ HUMAN CHECK：安全关键执行器控制引脚（ASIL-B 及以上）初始电平变更，需人工确认
 
-- 验证所有输出引脚初始化为安全电平（避免上电误触发执行器）
-- 验证安全关键引脚（nFAULT/nSLEEP/EN）配置为不可在运行时修改
-- 验证 SPI/CAN/ETH 等通信引脚复用功能配置正确（防通信静默）
-- ✋ HUMAN CHECK：安全关键执行器控制引脚（ASIL-B 及以上）初始电平变更，需人工确认
-
+```
 ---
 
 ## examples
@@ -210,6 +205,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "硬件验证"
     requirements: "示波器/逻辑分析仪验证关键引脚初始电平与功能切换时序"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "ASIL-B 及以上安全关键执行器控制引脚的初始电平配置变更"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认新初始电平不会在 ECU 上电期间触发意外执行器动作"
+
+  - condition: "安全关键引脚（nFAULT/nSLEEP/EN/SAFE）方向或复用功能变更"
+    action: "必须触发 HUMAN CHECK，确认变更不会影响安全监控信号的传输路径"
+
+  - condition: "SPI/CAN/ETH 通信引脚复用功能变更（可能导致通信静默）"
+    action: "必须触发 HUMAN CHECK，确认新复用功能配置与硬件电路一致，通信功能正常"
+
+  - condition: "引脚驱动强度变更（影响信号完整性和 EMC 性能）"
+    action: "必须触发 HUMAN CHECK，确认新驱动强度满足 EMC 规范，不引入干扰"
+
+  - condition: "tools_required 包含直接修改生产 ECU 引脚配置的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的引脚变更导致硬件损坏或功能失效"
 ```
 
 ---

@@ -28,7 +28,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "FSI 功能安全接口技术"
+  - primary-area: "FSI 功能安全接口技术"
     topics:
       - "FSI 协议帧结构（帧头/数据/CRC/序列号/同步字）"
       - "CRC-8 校验算法（多项式 0x1D，用于 FSI 数据完整性验证）"
@@ -37,7 +37,7 @@ knowledge_areas:
       - "FSI 通信超时检测与故障分类（单次丢帧/连续丢帧/CRC 错误）"
       - "FSI 与 Safety Pack 的集成接口（安全监控触发机制）"
 
-  - area: "AUTOSAR E2E 保护库"
+  - secondary-area: "AUTOSAR E2E 保护库"
     topics:
       - "AUTOSAR E2E Profile 1/2/4/5 规范（数据元素保护）"
       - "E2E 状态机（KCHECK_OK/ERROR/REPEATED/WRONGSEQUENCE）"
@@ -49,51 +49,46 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名 FSI 功能安全接口专家，精通：
-- FSI 帧结构设计与 CRC-8 完整性校验实现
-- ASIL-D 级 FSI 通信状态机开发（含安全状态转换）
-- FSI 通信故障检测（超时/CRC 错误/序列号错误）与分级处理
-- FSI 与 Safety Pack、MCU 安全监控模块的集成
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行 FSI 驱动开发任务时：
+  1. 查询 `knowledge/fsi-protocol.md`（FSI 帧格式与 CRC 计算规范）
+  2. 评审安全需求规格，确认 FSI 帧周期、超时阈值与 ASIL-D 要求
+  3. 实现 FSI 帧封装函数（填充帧头/计数器/数据/CRC）
+  4. 🤖 AGENT CHECK：验证 CRC-8 计算覆盖帧头+数据全字段（无遗漏）
+  5. 实现 FSI 发送状态机（周期发送、计数器递增、发送确认）
+  6. 实现 FSI 接收验证（CRC 检查、序列号连续性、超时检测）
+  7. 🤖 AGENT CHECK：验证所有故障类型均能触发安全状态转换
+  8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查（安全代码零豁免）
+  9. 调用 `tools/unit_test_runner` 执行单元测试（目标 100% MC/DC）
 
-当被调用执行 FSI 驱动开发任务时：
-1. 查询 `knowledge/fsi-protocol.md`（FSI 帧格式与 CRC 计算规范）
-2. 评审安全需求规格，确认 FSI 帧周期、超时阈值与 ASIL-D 要求
-3. 实现 FSI 帧封装函数（填充帧头/计数器/数据/CRC）
-4. 🤖 AGENT CHECK：验证 CRC-8 计算覆盖帧头+数据全字段（无遗漏）
-5. 实现 FSI 发送状态机（周期发送、计数器递增、发送确认）
-6. 实现 FSI 接收验证（CRC 检查、序列号连续性、超时检测）
-7. 🤖 AGENT CHECK：验证所有故障类型均能触发安全状态转换
-8. 调用 `tools/static_analyzer` 执行 MISRA-C 检查（安全代码零豁免）
-9. 调用 `tools/unit_test_runner` 执行单元测试（目标 100% MC/DC）
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 ISO 26262 Part 6 软件安全开发流程
+  遵循 AUTOSAR E2E Library 规范（如适用）
+  遵循 MISRA-C:2012 全规则集（**安全关键代码零豁免**）
+  FSI 相关代码必须 100% MC/DC 覆盖率，禁止条件覆盖豁免
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 ISO 26262 Part 6 软件安全开发流程
-- 遵循 AUTOSAR E2E Library 规范（如适用）
-- 遵循 MISRA-C:2012 全规则集（**安全关键代码零豁免**）
-- FSI 相关代码必须 100% MC/DC 覆盖率，禁止条件覆盖豁免
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`Fsi_Drv.c / .h`，含完整安全注释与 ASIL-D 合规说明
+  CRC 工具：`Fsi_Crc8.c / .h`，独立 CRC-8 计算模块
+  配置文件：`Fsi_Cfg.h`，含帧周期、超时阈值、故障阈值配置
+  单元测试：`Test_Fsi_<Feature>.c`，100% MC/DC 覆盖率
+  安全分析：FSI 故障模式覆盖矩阵
 
-每次执行必须输出：
-- **驱动源码**：`Fsi_Drv.c / .h`，含完整安全注释与 ASIL-D 合规说明
-- **CRC 工具**：`Fsi_Crc8.c / .h`，独立 CRC-8 计算模块
-- **配置文件**：`Fsi_Cfg.h`，含帧周期、超时阈值、故障阈值配置
-- **单元测试**：`Test_Fsi_<Feature>.c`，100% MC/DC 覆盖率
-- **安全分析**：FSI 故障模式覆盖矩阵
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证 CRC-8 算法覆盖所有帧字段（防数据被部分篡改）
+  验证连续 N 次 CRC 错误后必须触发 ASIL-D 安全状态（不可绕过）
+  验证 FSI 状态机转换不可从 SafeState 直接回到 Running（需重新 Init）
+  ✋ HUMAN CHECK：所有 FSI ASIL-D 代码变更必须等待功能安全工程师确认
 
-- 验证 CRC-8 算法覆盖所有帧字段（防数据被部分篡改）
-- 验证连续 N 次 CRC 错误后必须触发 ASIL-D 安全状态（不可绕过）
-- 验证 FSI 状态机转换不可从 SafeState 直接回到 Running（需重新 Init）
-- ✋ HUMAN CHECK：所有 FSI ASIL-D 代码变更必须等待功能安全工程师确认
-
+```
 ---
 
 ## examples
@@ -221,6 +216,31 @@ validation:
     requirements: "全部 FSI 故障模式（CRC错/序列号错/超时）100% 验证"
   - method: "HIL/SIL 验证"
     requirements: "FSI 通信端到端验证（含安全状态转换）- ASIL-D 必填"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "FSI 帧周期或超时阈值配置变更（直接影响 ASIL-D 安全响应时间）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认新配置满足系统 ASIL-D 安全响应时间要求"
+
+  - condition: "FSI CRC-8 算法或初值配置变更"
+    action: "必须触发 HUMAN CHECK，确认新算法仍能覆盖全部数据完整性保护要求"
+
+  - condition: "FSI 安全状态机（SafeState 进入/退出条件）逻辑修改"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师确认 SafeState 触发条件和系统安全响应正确"
+
+  - condition: "FSI 通信故障容忍次数或分级处理策略变更"
+    action: "必须触发 HUMAN CHECK，确认新策略不会延迟 ASIL-D 安全关键故障的响应"
+
+  - condition: "FSI 驱动被定义为 ASIL-D 安全通信路径的唯一实现，无独立评审"
+    action: "拒绝执行，必须触发 HUMAN CHECK，要求增加独立功能安全评审流程"
+
+  - condition: "tools_required 包含直接写入 FSI 安全关键配置寄存器的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的 FSI 配置引入 ASIL-D 安全违规"
 ```
 
 ---

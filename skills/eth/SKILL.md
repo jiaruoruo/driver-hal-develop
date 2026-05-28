@@ -30,7 +30,7 @@ automotive_standards:
 
 ```yaml
 knowledge_areas:
-  - area: "车载以太网技术"
+  - primary-area: "车载以太网技术"
     topics:
       - "以太网帧结构（前导码/SFD/目的MAC/源MAC/EtherType/Payload/FCS）"
       - "100BASE-T1 车载以太网物理层（单对非屏蔽双绞线、Master/Slave 配置）"
@@ -39,7 +39,7 @@ knowledge_areas:
       - "PHY 芯片配置（TJA1100/BCM89811 寄存器集）"
       - "链路状态检测机制（自协商、强制速率、Link Down 中断）"
 
-  - area: "AUTOSAR 以太网驱动集成"
+  - secondary-area: "AUTOSAR 以太网驱动集成"
     topics:
       - "AUTOSAR SWS_Eth 接口规范（Eth_Init/Eth_Transmit/Eth_Receive）"
       - "AUTOSAR EthIf/EthDrv/EthTrcv 分层关系"
@@ -51,49 +51,44 @@ knowledge_areas:
 
 ## instructions
 
-### A. Core Competencies（能力声明）
+```yaml
 
-你是一名车载以太网驱动专家，精通：
-- 车载 100BASE-T1/1000BASE-T1 以太网 MAC/PHY 驱动开发
-- AUTOSAR SWS_Eth 驱动接口实现（Eth_Init/Eth_Transmit/Eth_Receive）
-- MDIO 管理总线接口实现与 PHY 芯片寄存器配置
-- DMA 描述符链管理与零拷贝以太网帧收发
+段落 A：Approach（执行步骤）
 
-### B. Approach（执行步骤）
+  当被调用执行以太网驱动开发任务时：
+  1. 查询 `knowledge/ethernet-protocol.md`（协议规范与 PHY 寄存器定义）
+  2. 评审硬件原理图，确认 MAC 控制器型号、PHY 芯片型号与 MDIO 接口
+  3. 按 AUTOSAR SWS_Eth 规范实现 Eth_Init、Eth_Transmit、Eth_Receive
+  4. 🤖 AGENT CHECK：验证 DMA 描述符链配置（缓冲区大小/描述符数量）
+  5. 实现 MDIO 读写接口与 PHY 链路状态检测逻辑
+  6. 🤖 AGENT CHECK：验证以太网帧 FCS 错误处理与统计计数器更新
+  7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
+  8. 调用 `tools/unit_test_runner` 执行单元测试
 
-当被调用执行以太网驱动开发任务时：
-1. 查询 `knowledge/ethernet-protocol.md`（协议规范与 PHY 寄存器定义）
-2. 评审硬件原理图，确认 MAC 控制器型号、PHY 芯片型号与 MDIO 接口
-3. 按 AUTOSAR SWS_Eth 规范实现 Eth_Init、Eth_Transmit、Eth_Receive
-4. 🤖 AGENT CHECK：验证 DMA 描述符链配置（缓冲区大小/描述符数量）
-5. 实现 MDIO 读写接口与 PHY 链路状态检测逻辑
-6. 🤖 AGENT CHECK：验证以太网帧 FCS 错误处理与统计计数器更新
-7. 调用 `tools/static_analyzer` 执行 MISRA-C 检查
-8. 调用 `tools/unit_test_runner` 执行单元测试
+段落 B：Standards & Best Practices（规范遵循）
 
-### C. Standards & Best Practices（规范遵循）
+  遵循 `rules/coding-rules.md`（编码规范）
+  遵循 AUTOSAR SWS_Eth 4.x 接口规范
+  遵循 IEEE 802.3 以太网帧格式规范
+  遵循 MISRA-C:2012 全规则集（零未批准违规）
+  车载以太网须遵循 OPEN Alliance TC8 互操作性测试要求
 
-- 遵循 `rules/coding-rules.md`（编码规范）
-- 遵循 AUTOSAR SWS_Eth 4.x 接口规范
-- 遵循 IEEE 802.3 以太网帧格式规范
-- 遵循 MISRA-C:2012 全规则集（零未批准违规）
-- 车载以太网须遵循 OPEN Alliance TC8 互操作性测试要求
+段落 C：Deliverables（交付物定义）
 
-### D. Deliverables（交付物定义）
+  每次执行必须输出：
+  驱动源码：`Eth_<Platform>.c / .h`，含完整 Doxygen 注释
+  PHY 驱动：`EthTrcv_<PhyName>.c / .h`，含 MDIO 读写接口
+  配置文件：`EthCfg.h`，含 DMA 描述符数量与缓冲区配置
+  单元测试：`Test_Eth_<Feature>.c`，基于 Unity/ceedling 框架
 
-每次执行必须输出：
-- **驱动源码**：`Eth_<Platform>.c / .h`，含完整 Doxygen 注释
-- **PHY 驱动**：`EthTrcv_<PhyName>.c / .h`，含 MDIO 读写接口
-- **配置文件**：`EthCfg.h`，含 DMA 描述符数量与缓冲区配置
-- **单元测试**：`Test_Eth_<Feature>.c`，基于 Unity/ceedling 框架
+段落 D：Safety & Security Considerations（安全合规检查）
 
-### E. Safety & Security Considerations（安全合规检查）
+  验证以太网帧接收缓冲区不发生溢出（边界保护）
+  验证链路 Down 事件的安全响应（停止传输、通知上层）
+  验证 VLAN/优先级标签处理符合网络设计要求
+  ✋ HUMAN CHECK：若以太网用于 ASIL-B 及以上安全通信链路，需人工审查 AVTP/SOME-IP E2E 配置
 
-- 验证以太网帧接收缓冲区不发生溢出（边界保护）
-- 验证链路 Down 事件的安全响应（停止传输、通知上层）
-- 验证 VLAN/优先级标签处理符合网络设计要求
-- ✋ HUMAN CHECK：若以太网用于 ASIL-B 及以上安全通信链路，需人工审查 AVTP/SOME-IP E2E 配置
-
+```
 ---
 
 ## examples
@@ -212,6 +207,28 @@ validation:
     scope: "MISRA-C:2012 全规则集"
   - method: "HIL/SIL 验证"
     requirements: "链路 Up/Down 切换、帧错误注入、吞吐量测试（ASIL-B 必填）"
+```
+
+---
+
+## human_checks
+
+```yaml
+human_checks:
+  - condition: "以太网用于 ASIL-B 及以上安全通信链路（SOME-IP 安全服务/AVTP）"
+    action: "必须触发 HUMAN CHECK，由功能安全工程师审查 E2E 保护与 VLAN 安全配置"
+
+  - condition: "MAC 地址或 VLAN 优先级配置变更（影响安全帧路由）"
+    action: "必须触发 HUMAN CHECK，确认新配置不会导致安全关键以太网帧被丢弃或误路由"
+
+  - condition: "DMA 描述符数量或缓冲区大小变更（可能导致帧丢弃）"
+    action: "必须触发 HUMAN CHECK，确认新缓冲区配置能处理最大报文突发而不丢帧"
+
+  - condition: "PHY Link Down 事件的安全响应策略变更"
+    action: "必须触发 HUMAN CHECK，确认新策略满足应用层对链路断开的安全降级要求"
+
+  - condition: "tools_required 包含直接操作生产 ECU 以太网网络配置的工具权限"
+    action: "必须触发 HUMAN CHECK，防止未经评审的网络配置影响车载以太网安全"
 ```
 
 ---
