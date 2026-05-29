@@ -5,11 +5,8 @@ category: communication-driver
 domain: automotive
 subcategory: spi-bus
 
-description: >
-  专注于 SPI（Serial Peripheral Interface）总线底层驱动开发，
-  覆盖主从模式配置、DMA 传输优化、片选管理、时序配置
-  与 AUTOSAR SPI Handler Driver 规范实现，
-  确保 SPI 驱动满足实时性要求并符合 AUTOSAR 规范。
+description: 专注于 SPI（Serial Peripheral Interface）总线底层驱动开发，
+  覆盖主从模式配置、DMA 传输优化、片选管理、时序配置与 AUTOSAR SPI Handler Driver 规范实现，确保 SPI 驱动满足实时性要求并符合 AUTOSAR 规范。
 
 use_cases:
   - "配置 SPI 控制器（主模式/极性/相位/字长/速率）"

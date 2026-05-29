@@ -5,10 +5,9 @@ category: safety-driver
 domain: automotive
 subcategory: safety-monitor
 
-description: >
-  专注于 Safety Pack 安全监控包集成开发，覆盖安全监控窗口配置、
-  故障反应函数实现、安全状态机管理与 MCU 安全功能联动，
-  确保满足 ISO 26262 ASIL-D 功能安全要求。
+description: 专注于 Safety Pack 安全监控包集成开发，覆盖安全监控窗口配置、
+  故障反应函数实现、安全状态机管理与 MCU 安全功能联动，确保满足 ISO 26262 ASIL-D 功能安全要求。
+  
 
 use_cases:
   - "配置 Safety Pack 安全监控窗口（时间窗口/计数窗口）"

@@ -5,10 +5,8 @@ category: actuator-driver
 domain: automotive
 subcategory: load-driver
 
-description: >
-  专注于车规级高边驱动（HSD）和低边驱动（LSD）芯片（BTS7xxx/TLE72xx/MC33xxx）
-  底层驱动开发，覆盖负载开关控制、SPI 诊断接口、过流/短路/开路故障检测
-  及电流反馈采样，确保符合 ISO 26262 功能安全要求。
+description: 专注于车规级高边驱动（HSD）和低边驱动（LSD）芯片（BTS7xxx/TLE72xx/MC33xxx）底层驱动开发，覆盖负载开关控制、SPI 诊断接口、过流/短 路/开路故障检测,及电流反馈采样，确保符合 ISO 26262 功能安全要求。
+  
 
 use_cases:
   - "初始化 HSD/LSD 驱动芯片并配置 SPI 诊断接口"

@@ -5,10 +5,8 @@ category: storage-driver
 domain: automotive
 subcategory: external-flash
 
-description: >
-  专注于车规级外部 SPI/QSPI Flash 存储器（W25Qxxx/MX25Lxxx/GD25Qxxx）驱动开发，
-  覆盖读/写/扇区擦除/块擦除操作、写保护配置、SFDP 参数解析与数据完整性保护，
-  确保外部 Flash 驱动满足车规可靠性要求并符合 AUTOSAR Fls 规范。
+description: 专注于车规级外部 SPI/QSPI Flash 存储器（W25Qxxx/MX25Lxxx/GD25Qxxx）驱动开发，覆盖读/写/扇区擦除/块擦除操作、写保护配置、SFDP 参数解析与数据完整性保护，确保外部 Flash 驱动满足车规可靠性要求并符合 AUTOSAR Fls 规范。
+  
 
 use_cases:
   - "初始化外部 SPI Flash 并读取 JEDEC ID 验证芯片型号"

@@ -5,10 +5,8 @@ category: sensor-driver
 domain: automotive
 subcategory: data-acquisition
 
-description: >
-  专注于车载传感器驱动开发，覆盖 ADC 模拟传感器采集、SPI/I2C 数字传感器通信、
-  信号滤波算法、物理量转换与标定参数管理，
-  确保传感器驱动满足采样精度、实时性与 ISO 26262 功能安全要求。
+description: 专注于车载传感器驱动开发，覆盖 ADC 模拟传感器采集、SPI/I2C 数字传感器通信、信号滤波算法、物理量转换与标定参数管理，确保传感器驱动满足采样精度、实时性与 ISO 26262 功能安全要求。
+ 
 
 use_cases:
   - "实现 ADC 多通道传感器采集（温度/压力/电流传感器）"

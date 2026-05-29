@@ -5,10 +5,9 @@ category: mcal-driver
 domain: automotive
 subcategory: microcontroller-abstraction
 
-description: >
-  专注于 AUTOSAR MCU 驱动模块开发，覆盖微控制器时钟树配置、复位管理、
-  低功耗模式控制与 MCU 模式状态机实现，
-  确保符合 AUTOSAR SWS_Mcu 规范与 ISO 26262 功能安全要求。
+description: 专注于 AUTOSAR MCU 驱动模块开发，覆盖微控制器时钟树配置、复位管理、
+ 低功耗模式控制与 MCU 模式状态机实现，确保符合 AUTOSAR SWS_Mcu 规范与 ISO 26262 功能安全要求。
+
 
 use_cases:
   - "配置微控制器系统时钟（PLL/分频器/时钟门控）"

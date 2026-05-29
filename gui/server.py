@@ -17,6 +17,8 @@ import re
 import json
 import time
 import threading
+import shutil
+import uuid
 from pathlib import Path
 
 import yaml
@@ -494,6 +496,536 @@ class ProjectFileWatcher(FileSystemEventHandler):
     def on_deleted(self, event):
         if not event.is_directory:
             self._schedule_update(event.src_path, "deleted")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 项目管理器（多项目工作空间）
+# ──────────────────────────────────────────────────────────────────────────────
+
+class ProjectManager:
+    """管理多个项目（工作空间），每个项目是一个本地目录。
+    
+    项目列表持久化存储在 gui/projects_config.json 中。
+    每个项目记录格式: {id, name, path, created_at}
+    """
+
+    def __init__(self):
+        self.config_file = Path(__file__).parent / "projects_config.json"
+        self._ensure_config()
+
+    def _ensure_config(self):
+        if not self.config_file.exists():
+            self._write_config({"projects": []})
+
+    def _read_config(self) -> dict:
+        try:
+            with open(self.config_file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {"projects": []}
+
+    def _write_config(self, config: dict):
+        with open(self.config_file, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+
+    # ── 项目 CRUD ─────────────────────────────────────────────────────────────
+
+    def list_projects(self) -> list:
+        """返回所有已注册项目的列表。"""
+        return self._read_config().get("projects", [])
+
+    def create_project(self, name: str, path: str) -> dict:
+        """在指定路径创建新项目目录结构，并注册到配置文件。"""
+        project_path = Path(path)
+        project_path.mkdir(parents=True, exist_ok=True)
+        project = {
+            "id": str(uuid.uuid4())[:8],
+            "name": name,
+            "path": str(project_path.resolve()).replace("\\", "/"),
+            "created_at": time.time(),
+        }
+        config = self._read_config()
+        config["projects"].append(project)
+        self._write_config(config)
+        print(f"[PM] 创建项目: {name} @ {project['path']}")
+        return project
+
+    def open_project(self, path: str) -> dict:
+        """导入已有本地目录为项目（如已存在则直接返回）。"""
+        project_path = Path(path)
+        if not project_path.exists():
+            raise ValueError(f"路径不存在: {path}")
+        config = self._read_config()
+        resolved = str(project_path.resolve()).replace("\\", "/")
+        # 检查是否已注册
+        for p in config["projects"]:
+            if p["path"] == resolved:
+                return p
+        project = {
+            "id": str(uuid.uuid4())[:8],
+            "name": project_path.name,
+            "path": resolved,
+            "created_at": time.time(),
+        }
+        config["projects"].append(project)
+        self._write_config(config)
+        print(f"[PM] 导入项目: {project['name']} @ {resolved}")
+        return project
+
+    def delete_project(self, project_id: str, delete_files: bool = False) -> bool:
+        """从注册列表移除项目；delete_files=True 时同时删除目录。"""
+        config = self._read_config()
+        projects = config.get("projects", [])
+        for i, p in enumerate(projects):
+            if p["id"] == project_id:
+                if delete_files:
+                    try:
+                        shutil.rmtree(p["path"])
+                        print(f"[PM] 删除目录: {p['path']}")
+                    except Exception as e:
+                        print(f"[PM] 删除目录失败: {e}")
+                config["projects"].pop(i)
+                self._write_config(config)
+                return True
+        return False
+
+    def get_project(self, project_id: str) -> dict | None:
+        """根据 ID 查找项目，未找到返回 None。"""
+        for p in self.list_projects():
+            if p["id"] == project_id:
+                return p
+        return None
+
+    # ── 文件操作 ──────────────────────────────────────────────────────────────
+
+    def _safe_path(self, project_id: str, file_path: str) -> Path:
+        """验证并返回安全的绝对路径（防止路径穿越）。"""
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        root = Path(project["path"]).resolve()
+        full = (root / file_path).resolve()
+        if not str(full).startswith(str(root)):
+            raise ValueError("非法路径：路径穿越被拒绝")
+        return full
+
+    def get_file_tree(self, project_id: str) -> list:
+        """递归构建项目目录树，返回节点列表。"""
+        project = self.get_project(project_id)
+        if not project:
+            return []
+        root = Path(project["path"])
+
+        def build_node(path: Path, rel: str = "") -> dict:
+            name = path.name
+            rel_path = (rel + "/" + name).lstrip("/") if rel else name
+            if path.is_file():
+                return {
+                    "name": name,
+                    "path": rel_path,
+                    "type": "file",
+                    "ext": path.suffix.lower(),
+                    "size": path.stat().st_size,
+                }
+            else:
+                children = []
+                try:
+                    items = sorted(path.iterdir(),
+                                   key=lambda x: (x.is_file(), x.name.lower()))
+                    for child in items:
+                        if child.name.startswith(".") or child.name in ("__pycache__",):
+                            continue
+                        children.append(build_node(child, rel_path))
+                except PermissionError:
+                    pass
+                return {
+                    "name": name,
+                    "path": rel_path,
+                    "type": "dir",
+                    "children": children,
+                }
+
+        node = build_node(root)
+        return node.get("children", [])
+
+    def read_file(self, project_id: str, file_path: str) -> str:
+        """读取项目内文件内容。"""
+        full = self._safe_path(project_id, file_path)
+        if not full.exists():
+            raise FileNotFoundError(f"文件不存在: {file_path}")
+        return full.read_text(encoding="utf-8", errors="replace")
+
+    def write_file(self, project_id: str, file_path: str, content: str):
+        """创建或覆盖项目内文件。"""
+        full = self._safe_path(project_id, file_path)
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(content, encoding="utf-8")
+
+    def delete_file(self, project_id: str, file_path: str):
+        """删除项目内文件或目录。"""
+        full = self._safe_path(project_id, file_path)
+        if not full.exists():
+            raise FileNotFoundError(f"路径不存在: {file_path}")
+        if full.is_dir():
+            shutil.rmtree(full)
+        else:
+            full.unlink()
+
+    def create_dir(self, project_id: str, dir_path: str):
+        """在项目内创建目录。"""
+        full = self._safe_path(project_id, dir_path)
+        full.mkdir(parents=True, exist_ok=True)
+
+    def rename_file(self, project_id: str, old_path: str, new_path: str):
+        """重命名/移动项目内文件或目录。"""
+        full_old = self._safe_path(project_id, old_path)
+        full_new = self._safe_path(project_id, new_path)
+        if not full_old.exists():
+            raise FileNotFoundError(f"源路径不存在: {old_path}")
+        full_new.parent.mkdir(parents=True, exist_ok=True)
+        full_old.rename(full_new)
+
+    # ── Agent 管理 ────────────────────────────────────────────────────────────
+
+    def list_agents(self, project_id: str) -> list:
+        """列出项目 agents/ 目录的所有 .md 文件。"""
+        project = self.get_project(project_id)
+        if not project:
+            return []
+        agents_dir = Path(project["path"]) / "agents"
+        if not agents_dir.exists():
+            return []
+        result = []
+        for f in sorted(agents_dir.glob("*.md")):
+            result.append({
+                "name": f.stem,
+                "filename": f.name,
+                "path": f"agents/{f.name}",
+                "size": f.stat().st_size,
+                "modified": f.stat().st_mtime,
+            })
+        return result
+
+    def add_agent_local(self, project_id: str, src_path: str) -> dict:
+        """复制本地 agent .md 文件到项目 agents/ 目录。"""
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        src = Path(src_path)
+        if not src.exists():
+            raise ValueError(f"文件不存在: {src_path}")
+        if src.suffix.lower() != ".md":
+            raise ValueError("Agent 文件必须是 .md 格式")
+        agents_dir = Path(project["path"]) / "agents"
+        agents_dir.mkdir(exist_ok=True)
+        dest = agents_dir / src.name
+        shutil.copy2(src, dest)
+        print(f"[PM] 添加 Agent (local): {src.name} → {dest}")
+        return {"name": src.stem, "path": f"agents/{src.name}"}
+
+    def add_agent_github(self, project_id: str, github_url: str) -> dict:
+        """从 GitHub URL 下载 agent .md 文件到项目 agents/ 目录。"""
+        try:
+            import requests as req
+        except ImportError:
+            raise RuntimeError("requests 库未安装，请运行: pip install requests")
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        agents_dir = Path(project["path"]) / "agents"
+        agents_dir.mkdir(exist_ok=True)
+
+        raw_url = self._github_blob_to_raw(github_url)
+        resp = req.get(raw_url, timeout=30)
+        resp.raise_for_status()
+        filename = raw_url.rstrip("/").split("/")[-1]
+        if not filename.lower().endswith(".md"):
+            filename += ".md"
+        dest = agents_dir / filename
+        dest.write_bytes(resp.content)
+        print(f"[PM] 添加 Agent (github): {filename}")
+        return {"name": dest.stem, "path": f"agents/{filename}"}
+
+    def delete_agent(self, project_id: str, agent_name: str):
+        """删除项目 agents/ 目录下指定的 agent 文件。"""
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        agents_dir = Path(project["path"]) / "agents"
+        # 支持带或不带 .md 扩展名
+        for candidate in [
+            agents_dir / agent_name,
+            agents_dir / (agent_name + ".md"),
+        ]:
+            if candidate.exists():
+                candidate.unlink()
+                print(f"[PM] 删除 Agent: {candidate.name}")
+                return
+        raise ValueError(f"Agent 不存在: {agent_name}")
+
+    # ── Skill 管理 ────────────────────────────────────────────────────────────
+
+    def list_skills(self, project_id: str) -> list:
+        """列出项目 skills/ 目录下的所有 skill 子目录。"""
+        project = self.get_project(project_id)
+        if not project:
+            return []
+        skills_dir = Path(project["path"]) / "skills"
+        if not skills_dir.exists():
+            return []
+        result = []
+        for d in sorted(skills_dir.iterdir()):
+            if d.is_dir():
+                skill_file = d / "SKILL.md"
+                result.append({
+                    "name": d.name,
+                    "path": f"skills/{d.name}",
+                    "has_skill_md": skill_file.exists(),
+                    "modified": d.stat().st_mtime,
+                })
+        return result
+
+    def add_skill_local(self, project_id: str, src_path: str) -> dict:
+        """复制本地 skill 目录（或 SKILL.md 文件）到项目 skills/ 目录。"""
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        src = Path(src_path)
+        if not src.exists():
+            raise ValueError(f"路径不存在: {src_path}")
+        skills_dir = Path(project["path"]) / "skills"
+        skills_dir.mkdir(exist_ok=True)
+        if src.is_dir():
+            dest = skills_dir / src.name
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(src, dest)
+            print(f"[PM] 添加 Skill (local dir): {src.name}")
+            return {"name": src.name, "path": f"skills/{src.name}"}
+        elif src.is_file() and src.name.upper() == "SKILL.MD":
+            skill_name = src.parent.name
+            dest_dir = skills_dir / skill_name
+            dest_dir.mkdir(exist_ok=True)
+            shutil.copy2(src, dest_dir / "SKILL.md")
+            print(f"[PM] 添加 Skill (local SKILL.md): {skill_name}")
+            return {"name": skill_name, "path": f"skills/{skill_name}"}
+        else:
+            raise ValueError("Skill 源路径需要是目录或 SKILL.md 文件")
+
+    def add_skill_github(self, project_id: str, github_url: str) -> dict:
+        """从 GitHub URL 下载 skill 目录内容到项目 skills/ 目录。"""
+        try:
+            import requests as req
+        except ImportError:
+            raise RuntimeError("requests 库未安装，请运行: pip install requests")
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        skills_dir = Path(project["path"]) / "skills"
+        skills_dir.mkdir(exist_ok=True)
+
+        owner, repo, ref, path = self._parse_github_url(github_url)
+        skill_name = path.rstrip("/").split("/")[-1] if path else repo
+        dest_dir = skills_dir / skill_name
+        dest_dir.mkdir(exist_ok=True)
+        self._download_github_contents(req, owner, repo, ref, path, dest_dir)
+        print(f"[PM] 添加 Skill (github): {skill_name}")
+        return {"name": skill_name, "path": f"skills/{skill_name}"}
+
+    def delete_skill(self, project_id: str, skill_name: str):
+        """删除项目 skills/ 目录下的 skill 子目录。"""
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("项目不存在")
+        skill_dir = Path(project["path"]) / "skills" / skill_name
+        if skill_dir.exists() and skill_dir.is_dir():
+            shutil.rmtree(skill_dir)
+            print(f"[PM] 删除 Skill: {skill_name}")
+        else:
+            raise ValueError(f"Skill 不存在: {skill_name}")
+
+    # ── GitHub 辅助方法 ───────────────────────────────────────────────────────
+
+    def _github_blob_to_raw(self, url: str) -> str:
+        """将 GitHub blob URL 转换为 raw 内容下载 URL。"""
+        url = url.strip().rstrip("/")
+        # https://github.com/user/repo/blob/branch/path → https://raw.githubusercontent.com/...
+        url = url.replace("https://github.com/", "https://raw.githubusercontent.com/")
+        url = url.replace("/blob/", "/")
+        return url
+
+    def _parse_github_url(self, url: str) -> tuple:
+        """解析 GitHub URL，返回 (owner, repo, ref, path)。
+        
+        支持格式:
+        - https://github.com/user/repo
+        - https://github.com/user/repo/tree/branch/path/to/dir
+        - https://github.com/user/repo/blob/branch/path/to/file.md
+        """
+        url = url.strip().rstrip("/")
+        m = re.match(
+            r"https://github\.com/([^/]+)/([^/]+)"
+            r"(?:/(?:tree|blob)/([^/]+)(?:/(.+))?)?",
+            url
+        )
+        if not m:
+            raise ValueError(f"无效的 GitHub URL: {url}")
+        owner = m.group(1)
+        repo = m.group(2)
+        ref = m.group(3) or "main"
+        path = (m.group(4) or "").rstrip("/")
+        return owner, repo, ref, path
+
+    def _download_github_contents(self, req, owner, repo, ref, path, dest_dir: Path):
+        """递归从 GitHub Contents API 下载目录或文件。"""
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+        if ref:
+            api_url += f"?ref={ref}"
+        headers = {"Accept": "application/vnd.github.v3+json",
+                   "User-Agent": "driver-hal-gui"}
+        resp = req.get(api_url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        items = resp.json()
+        if isinstance(items, dict):
+            items = [items]
+        for item in items:
+            if item["type"] == "file":
+                dl_url = item.get("download_url")
+                if dl_url:
+                    file_resp = req.get(dl_url, timeout=30)
+                    file_resp.raise_for_status()
+                    (dest_dir / item["name"]).write_bytes(file_resp.content)
+            elif item["type"] == "dir":
+                subdir = dest_dir / item["name"]
+                subdir.mkdir(exist_ok=True)
+                self._download_github_contents(req, owner, repo, ref,
+                                               item["path"], subdir)
+
+
+    def download_github_repo(self, github_url: str, project_name: str = None,
+                             local_path: str = None) -> dict:
+        """从 GitHub URL 下载整个仓库到本地，注册为新项目。
+
+        支持格式:
+          - https://github.com/owner/repo
+          - https://github.com/owner/repo/tree/branch
+          - https://github.com/owner/repo/tree/branch/sub/path
+
+        参数:
+          github_url   - GitHub 仓库 URL
+          project_name - 项目名称（默认取仓库名）
+          local_path   - 本地保存路径（默认 gui/projects/{repo_name}）
+
+        返回项目信息 + downloaded/skipped 统计。
+        """
+        try:
+            import requests as req
+        except ImportError:
+            raise RuntimeError("requests 库未安装，请运行: pip install requests")
+
+        owner, repo, ref, sub_path = self._parse_github_url(github_url)
+
+        # 确定项目名称和本地保存路径
+        if not project_name:
+            project_name = repo
+        if not local_path:
+            local_path = str(Path(__file__).parent / "projects" / project_name)
+
+        dest = Path(local_path)
+        # 如果目录已存在，追加时间戳避免冲突
+        if dest.exists():
+            import time as _t
+            local_path = local_path.rstrip('/\\') + '_' + str(int(_t.time()))
+            dest = Path(local_path)
+
+        dest.mkdir(parents=True, exist_ok=True)
+        print(f"[PM] 开始下载 GitHub 仓库: {owner}/{repo} ref={ref}")
+
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "driver-hal-gui",
+        }
+
+        # 使用 GitHub Git Trees API（recursive=1）一次性获取整个仓库文件树
+        api_url = (f"https://api.github.com/repos/{owner}/{repo}"
+                   f"/git/trees/{ref}?recursive=1")
+        resp = req.get(api_url, headers=headers, timeout=30)
+        resp.raise_for_status()
+        tree_data = resp.json()
+        items = tree_data.get("tree", [])
+
+        # 跳过常见二进制扩展名（不影响源码阅读）
+        BINARY_EXTS = {
+            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.webp',
+            '.mp4', '.mp3', '.wav', '.avi', '.mov', '.mkv',
+            '.zip', '.gz', '.tar', '.rar', '.7z', '.bz2',
+            '.exe', '.dll', '.so', '.dylib', '.bin', '.hex', '.elf',
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+            '.class', '.o', '.obj', '.lib', '.a', '.wasm',
+            '.ttf', '.woff', '.woff2', '.eot', '.otf',
+            '.pyc', '.pyo', '.pyd',
+        }
+
+        downloaded = 0
+        skipped = 0
+        path_prefix = (sub_path.rstrip('/') + '/') if sub_path else ''
+
+        for item in items:
+            if item.get('type') != 'blob':
+                continue  # 跳过目录节点
+
+            item_path = item['path']
+
+            # 只下载指定子路径下的文件
+            if path_prefix and not item_path.startswith(path_prefix):
+                continue
+
+            # 计算相对目标路径
+            rel_path = item_path[len(path_prefix):] if path_prefix else item_path
+            suffix = Path(rel_path).suffix.lower()
+
+            if suffix in BINARY_EXTS:
+                skipped += 1
+                continue
+
+            dest_file = dest / rel_path
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+
+            raw_url = (f"https://raw.githubusercontent.com"
+                       f"/{owner}/{repo}/{ref}/{item_path}")
+            try:
+                file_resp = req.get(raw_url, headers=headers, timeout=30)
+                file_resp.raise_for_status()
+                dest_file.write_bytes(file_resp.content)
+                downloaded += 1
+            except Exception as _e:
+                print(f"[PM] 跳过 {item_path}: {_e}")
+                skipped += 1
+
+        print(f"[PM] 下载完成: {downloaded} 个文件, 跳过 {skipped} 个")
+
+        # 注册为新项目
+        project = self.open_project(str(dest))
+        # 如果用户指定了项目名称，更新配置
+        if project_name and project_name != dest.name:
+            project['name'] = project_name
+            config = self._read_config()
+            for p in config['projects']:
+                if p['id'] == project['id']:
+                    p['name'] = project_name
+                    break
+            self._write_config(config)
+
+        return {
+            **project,
+            'downloaded': downloaded,
+            'skipped': skipped,
+            'source_url': github_url,
+        }
+
+
+# 全局项目管理器实例
+project_manager = ProjectManager()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1636,6 +2168,226 @@ def api_list_skills():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# 项目管理 API
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/projects")
+def api_list_projects():
+    """返回所有已注册项目列表。"""
+    return jsonify({"projects": project_manager.list_projects()})
+
+
+@app.route("/api/projects/create", methods=["POST"])
+def api_create_project():
+    """创建新项目（在指定路径生成目录结构）。"""
+    body = request.get_json(silent=True) or {}
+    name = body.get("name", "").strip()
+    path = body.get("path", "").strip()
+    if not name or not path:
+        return jsonify({"error": "name 和 path 为必填项"}), 400
+    try:
+        project = project_manager.create_project(name, path)
+        return jsonify({"status": "ok", "project": project})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/open", methods=["POST"])
+def api_open_project():
+    """导入本地已有目录为项目。"""
+    body = request.get_json(silent=True) or {}
+    path = body.get("path", "").strip()
+    if not path:
+        return jsonify({"error": "path 为必填项"}), 400
+    try:
+        project = project_manager.open_project(path)
+        return jsonify({"status": "ok", "project": project})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>", methods=["DELETE"])
+def api_delete_project(project_id):
+    """从注册列表删除项目（可选：同时删除文件）。"""
+    body = request.get_json(silent=True) or {}
+    delete_files = bool(body.get("delete_files", False))
+    ok = project_manager.delete_project(project_id, delete_files)
+    if not ok:
+        return jsonify({"error": "项目不存在"}), 404
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/projects/<project_id>/tree")
+def api_project_tree(project_id):
+    """获取项目文件目录树。"""
+    try:
+        tree = project_manager.get_file_tree(project_id)
+        return jsonify({"tree": tree})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/file", methods=["GET"])
+def api_read_project_file(project_id):
+    """读取项目内文件内容。"""
+    file_path = request.args.get("path", "").strip()
+    if not file_path:
+        return jsonify({"error": "path 参数为必填项"}), 400
+    try:
+        content = project_manager.read_file(project_id, file_path)
+        return jsonify({"content": content, "path": file_path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/file", methods=["POST"])
+def api_write_project_file(project_id):
+    """创建或覆盖项目内文件。"""
+    body = request.get_json(silent=True) or {}
+    file_path = body.get("path", "").strip()
+    content = body.get("content", "")
+    if not file_path:
+        return jsonify({"error": "path 为必填项"}), 400
+    try:
+        project_manager.write_file(project_id, file_path, content)
+        return jsonify({"status": "ok", "path": file_path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/file", methods=["DELETE"])
+def api_delete_project_file(project_id):
+    """删除项目内文件或目录。"""
+    file_path = request.args.get("path", "").strip()
+    if not file_path:
+        return jsonify({"error": "path 参数为必填项"}), 400
+    try:
+        project_manager.delete_file(project_id, file_path)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/rename", methods=["POST"])
+def api_rename_project_file(project_id):
+    """重命名/移动项目内文件。"""
+    body = request.get_json(silent=True) or {}
+    old_path = body.get("old_path", "").strip()
+    new_path = body.get("new_path", "").strip()
+    if not old_path or not new_path:
+        return jsonify({"error": "old_path 和 new_path 为必填项"}), 400
+    try:
+        project_manager.rename_file(project_id, old_path, new_path)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/mkdir", methods=["POST"])
+def api_create_project_dir(project_id):
+    """在项目内创建目录。"""
+    body = request.get_json(silent=True) or {}
+    dir_path = body.get("path", "").strip()
+    if not dir_path:
+        return jsonify({"error": "path 为必填项"}), 400
+    try:
+        project_manager.create_dir(project_id, dir_path)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/agents")
+def api_project_agents(project_id):
+    """列出项目的所有 Agents。"""
+    return jsonify({"agents": project_manager.list_agents(project_id)})
+
+
+@app.route("/api/projects/<project_id>/add_agent", methods=["POST"])
+def api_add_project_agent(project_id):
+    """向项目添加 Agent（本地文件复制或 GitHub URL 下载）。"""
+    body = request.get_json(silent=True) or {}
+    source = body.get("source", "local")
+    try:
+        if source == "local":
+            src_path = body.get("path", "").strip()
+            if not src_path:
+                return jsonify({"error": "path 为必填项"}), 400
+            result = project_manager.add_agent_local(project_id, src_path)
+        elif source == "github":
+            url = body.get("url", "").strip()
+            if not url:
+                return jsonify({"error": "url 为必填项"}), 400
+            result = project_manager.add_agent_github(project_id, url)
+        elif source == "pool":
+            rel_path = body.get("path", "").strip()
+            if not rel_path:
+                return jsonify({"error": "path 为必填项"}), 400
+            src_path = str(PROJECT_ROOT / rel_path)
+            result = project_manager.add_agent_local(project_id, src_path)
+        else:
+            return jsonify({"error": "source 必须为 local、github 或 pool"}), 400
+        return jsonify({"status": "ok", "agent": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/agents/<agent_name>", methods=["DELETE"])
+def api_delete_project_agent(project_id, agent_name):
+    """删除项目中的指定 Agent。"""
+    try:
+        project_manager.delete_agent(project_id, agent_name)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/skills")
+def api_project_skills(project_id):
+    """列出项目的所有 Skills。"""
+    return jsonify({"skills": project_manager.list_skills(project_id)})
+
+
+@app.route("/api/projects/<project_id>/add_skill", methods=["POST"])
+def api_add_project_skill(project_id):
+    """向项目添加 Skill（本地目录复制或 GitHub URL 下载）。"""
+    body = request.get_json(silent=True) or {}
+    source = body.get("source", "local")
+    try:
+        if source == "local":
+            src_path = body.get("path", "").strip()
+            if not src_path:
+                return jsonify({"error": "path 为必填项"}), 400
+            result = project_manager.add_skill_local(project_id, src_path)
+        elif source == "github":
+            url = body.get("url", "").strip()
+            if not url:
+                return jsonify({"error": "url 为必填项"}), 400
+            result = project_manager.add_skill_github(project_id, url)
+        elif source == "pool":
+            rel_path = body.get("path", "").strip()
+            if not rel_path:
+                return jsonify({"error": "path 为必填项"}), 400
+            src_path = str(PROJECT_ROOT / rel_path)
+            result = project_manager.add_skill_local(project_id, src_path)
+        else:
+            return jsonify({"error": "source 必须为 local、github 或 pool"}), 400
+        return jsonify({"status": "ok", "skill": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<project_id>/skills/<skill_name>", methods=["DELETE"])
+def api_delete_project_skill(project_id, skill_name):
+    """删除项目中的指定 Skill。"""
+    try:
+        project_manager.delete_skill(project_id, skill_name)
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Socket.IO 事件
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -1696,6 +2448,208 @@ def start_file_watcher():
 # ──────────────────────────────────────────────────────────────────────────────
 # 入口
 # ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/browse")
+def api_browse():
+    """Native OS file/folder picker via tkinter."""
+    browse_type  = request.args.get('type',   'dir')
+    file_filter  = request.args.get('filter', '')
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        if browse_type == 'file':
+            filetypes = [("Markdown files", "*.md"), ("All files", "*.*")] if file_filter == 'md' else [("All files", "*.*")]
+            path = filedialog.askopenfilename(parent=root, filetypes=filetypes)
+        else:
+            path = filedialog.askdirectory(parent=root)
+        root.destroy()
+        return jsonify({"path": path or ""})
+    except Exception as e:
+        return jsonify({"error": str(e), "path": ""}), 500
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CLI 工具扫描 & 团队目录管理
+# ──────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/scan_cli")
+def api_scan_cli():
+    """扫描本地已安装的 AI CLI 工具。"""
+    import subprocess as _sp
+    import shutil as _shu
+
+    home = Path.home()
+    CLI_TOOLS = [
+        {"id":"claude",      "name":"Claude Code",           "cmd":"claude",      "cfg":".claude",              "folder":".claude"},
+        {"id":"gemini",      "name":"Gemini CLI",             "cmd":"gemini",      "cfg":".gemini",              "folder":".gemini"},
+        {"id":"openai",      "name":"OpenAI CLI",             "cmd":"openai",      "cfg":None,                   "folder":".openai"},
+        {"id":"aider",       "name":"Aider",                  "cmd":"aider",       "cfg":".aider",               "folder":".aider"},
+        {"id":"cursor",      "name":"Cursor",                 "cmd":"cursor",      "cfg":".cursor",              "folder":".cursor"},
+        {"id":"windsurf",    "name":"Windsurf (Codeium)",     "cmd":"windsurf",    "cfg":".windsurf",            "folder":".windsurf"},
+        {"id":"continue",    "name":"Continue.dev",           "cmd":"continue",    "cfg":".continue",            "folder":".continue"},
+        {"id":"copilot",     "name":"GitHub Copilot",         "cmd":"gh",          "cfg":None,                   "folder":".copilot"},
+        {"id":"cline",       "name":"Cline / Roo Code",       "cmd":"cline",       "cfg":".cline",               "folder":".cline"},
+        {"id":"amp",         "name":"Amp Code",               "cmd":"amp",         "cfg":".config/amp",          "folder":".amp"},
+        {"id":"goose",       "name":"Goose AI",               "cmd":"goose",       "cfg":".config/goose",        "folder":".goose"},
+        {"id":"ollama",      "name":"Ollama",                 "cmd":"ollama",      "cfg":".ollama",              "folder":".ollama"},
+        {"id":"interpreter", "name":"Open Interpreter",       "cmd":"interpreter", "cfg":".config/interpreter",  "folder":".interpreter"},
+        {"id":"amazon-q",    "name":"Amazon Q CLI",           "cmd":"q",           "cfg":".aws/amazonq",         "folder":".aws/amazonq"},
+        {"id":"llm",         "name":"LLM (Simon Willison)",   "cmd":"llm",         "cfg":".config/io.datasette.llm","folder":".llm"},
+        {"id":"sgpt",        "name":"Shell GPT",              "cmd":"sgpt",        "cfg":".config/shell_gpt",    "folder":".sgpt"},
+        {"id":"kiro",        "name":"Amazon Kiro",            "cmd":"kiro",        "cfg":".kiro",                "folder":".kiro"},
+    ]
+    results = []
+    for tool in CLI_TOOLS:
+        status      = "not_found"
+        version     = None
+        install_path = None
+        if tool["cmd"]:
+            p = _shu.which(tool["cmd"])
+            if p:
+                status = "found"
+                install_path = p
+                try:
+                    r = _sp.run([tool["cmd"], "--version"],
+                                capture_output=True, text=True, timeout=3)
+                    out = (r.stdout or r.stderr or "").strip()
+                    if out:
+                        version = out.split("\n")[0][:60]
+                except Exception:
+                    pass
+        if tool["cfg"] and (home / tool["cfg"]).exists():
+            status = "installed" if status == "found" else "config_found"
+        results.append({
+            "id": tool["id"], "name": tool["name"],
+            "status": status, "version": version,
+            "folder": tool["folder"], "path": install_path,
+        })
+    return jsonify({"tools": results})
+
+
+@app.route("/api/projects/<project_id>/setup_team_dir", methods=["POST"])
+def api_setup_team_dir(project_id):
+    """在项目目录下创建以 CLI 命名的团队目录及子目录。"""
+    body = request.get_json(silent=True) or {}
+    folder_name = body.get("folder", "").strip()
+    if not folder_name:
+        return jsonify({"error": "folder 为必填项"}), 400
+    project = project_manager.get_project(project_id)
+    if not project:
+        return jsonify({"error": "项目不存在"}), 404
+    project_path = Path(project["path"])
+    team_dir = project_path / folder_name
+    subdirs = ["agents", "skills", "knowledge", "rules", "tools"]
+    try:
+        already_existed = team_dir.exists()
+        team_dir.mkdir(parents=True, exist_ok=True)
+        for sub in subdirs:
+            (team_dir / sub).mkdir(exist_ok=True)
+        return jsonify({
+            "status": "ok", "team_dir": str(team_dir),
+            "subdirs": subdirs, "already_existed": already_existed,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def _resolve_ref_path(ref, subdir):
+    """Resolve a reference to an absolute Path, or None."""
+    if not ref:
+        return None
+    p = Path(str(ref).strip())
+    if p.is_absolute() and p.exists():
+        return p
+    for base in [PROJECT_ROOT / p, PROJECT_ROOT / subdir / p]:
+        if base.exists():
+            return base
+    return None
+
+
+@app.route("/api/projects/<project_id>/agent_related_files/<agent_name>")
+def api_agent_related_files(project_id, agent_name):
+    """获取 Agent 的路由关联文件列表（含冲突检测）。"""
+    folder = request.args.get("folder", "").strip()
+    project = project_manager.get_project(project_id)
+    if not project:
+        return jsonify({"error": "项目不存在"}), 404
+    agents = project_manager.list_agents(project_id)
+    agent_info = next((a for a in agents if a.get("name") == agent_name), None)
+    if not agent_info:
+        return jsonify({"error": f"Agent '{agent_name}' 不存在"}), 404
+
+    agent_path_str = agent_info.get("path", "")
+    project_path   = Path(project["path"])
+    team_dir       = (project_path / folder) if folder else None
+    files          = []
+
+    def add_file(src_str, dst_rel, ftype):
+        src = Path(src_str)
+        if src.exists():
+            exists_in_team = bool(team_dir and (team_dir / dst_rel).exists())
+            files.append({"src": str(src), "dst": dst_rel, "type": ftype,
+                          "name": src.name, "exists": exists_in_team})
+
+    if agent_path_str:
+        add_file(agent_path_str, "agents/" + Path(agent_path_str).name, "agent")
+        try:
+            content = Path(agent_path_str).read_text(encoding="utf-8")
+            fm_match = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+            if fm_match:
+                fm = yaml.safe_load(fm_match.group(1)) or {}
+                for ref in (fm.get("skills", []) or []):
+                    p = _resolve_ref_path(ref, "skills")
+                    if p: add_file(str(p), "skills/" + p.name, "skill")
+                for ref in (fm.get("tools", []) or []):
+                    p = _resolve_ref_path(ref, "tools")
+                    if p: add_file(str(p), "tools/" + p.name, "tool")
+                for ref in (fm.get("knowledge", []) or []):
+                    p = _resolve_ref_path(ref, "knowledge")
+                    if p: add_file(str(p), "knowledge/" + p.name, "knowledge")
+                for ref in (fm.get("rules", []) or []):
+                    p = _resolve_ref_path(ref, "rules")
+                    if p: add_file(str(p), "rules/" + p.name, "rule")
+        except Exception:
+            pass
+
+    return jsonify({"files": files, "agent": agent_name})
+
+
+@app.route("/api/projects/<project_id>/copy_agent_files", methods=["POST"])
+def api_copy_agent_files(project_id):
+    """将指定文件 copy 到项目团队目录。"""
+    body = request.get_json(silent=True) or {}
+    folder_name = body.get("folder", "").strip()
+    files       = body.get("files", [])
+    project     = project_manager.get_project(project_id)
+    if not project:
+        return jsonify({"error": "项目不存在"}), 404
+    team_dir = Path(project["path"]) / folder_name
+    results  = []
+    for f in files:
+        src       = Path(f.get("src", ""))
+        dst_rel   = f.get("dst", "")
+        overwrite = bool(f.get("overwrite", True))
+        dst_path  = team_dir / dst_rel
+        if not src.exists():
+            results.append({"dst": dst_rel, "status": "src_not_found"})
+            continue
+        if dst_path.exists() and not overwrite:
+            results.append({"dst": dst_rel, "status": "conflict"})
+            continue
+        try:
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            if src.is_dir():
+                shutil.copytree(str(src), str(dst_path), dirs_exist_ok=True)
+            else:
+                shutil.copy2(str(src), str(dst_path))
+            results.append({"dst": dst_rel, "status": "ok"})
+        except Exception as e:
+            results.append({"dst": dst_rel, "status": "error", "error": str(e)})
+    return jsonify({"results": results})
+
 
 if __name__ == "__main__":
     print("=" * 60)

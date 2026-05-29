@@ -5,10 +5,8 @@ category: communication-driver
 domain: automotive
 subcategory: i2c-bus
 
-description: >
-  专注于车载 I2C（IIC）总线底层驱动开发，覆盖主从模式配置、设备地址管理、
-  时序约束实现、时钟拉伸处理与 AUTOSAR I2c 驱动规范实现，
-  确保 I2C 驱动满足传感器/执行器通信时序要求并符合 AUTOSAR 规范。
+description: 专注于车载 I2C（IIC）总线底层驱动开发，覆盖主从模式配置、设备地址管理、时序约束实现、时钟拉伸处理与 AUTOSAR I2c 驱动规范实现，确保 I2C 驱动满足传感器/执行器通信时序要求并符合 AUTOSAR 规范。
+  
 
 use_cases:
   - "配置 I2C 控制器（主模式、100kHz/400kHz/1MHz 速率）"

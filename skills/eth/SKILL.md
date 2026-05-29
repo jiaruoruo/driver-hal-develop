@@ -5,10 +5,10 @@ category: communication-driver
 domain: automotive
 subcategory: ethernet
 
-description: >
-  专注于车载以太网 MAC/PHY 驱动开发，覆盖 PHY 初始化、MDIO 管理接口、
-  链路状态检测、MAC 帧收发与 AUTOSAR EthDrv 规范实现，
-  确保以太网驱动满足车规级可靠性要求并符合 IEEE 802.3 与 AUTOSAR 规范。
+description: 专注于车载以太网 MAC/PHY 驱动开发，覆盖 PHY 初始化、MDIO 管理接口、
+ 链路状态检测、MAC 帧收发与 AUTOSAR EthDrv 规范实现，
+ 确保以太网驱动满足车规级可靠性要求并符合 IEEE 802.3 与 AUTOSAR 规范。
+  
 
 use_cases:
   - "初始化以太网 MAC 控制器与外部 PHY 芯片（TJA1100/BCM89811 等）"

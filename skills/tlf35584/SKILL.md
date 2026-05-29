@@ -5,11 +5,8 @@ category: pmic-driver
 domain: automotive
 subcategory: power-management
 
-description: >
-  专注于英飞凌 TLF35584 车规级 PMIC 驱动开发，覆盖 SPI 16 位帧（奇校验）通信、
-  电源轨配置、VMON 电压监控、看门狗窗口/问答模式配置与安全状态机管理。
-  确保满足 ISO 26262 ASIL-D 功能安全要求，支持 MCU 与 PMIC 安全联动及 AUTOSAR EcuM 集成。
-
+description: 专注于英飞凌 TLF35584 车规级 PMIC 驱动开发，覆盖 SPI 16 位帧（奇校验）通信、电源轨配置、VMON 电压监控、看门狗窗口/问答模式配置与安全状态机管理。确保满足 ISO 26262 ASIL-D 功能安全要求，支持 MCU 与 PMIC 安全联动及 AUTOSAR EcuM 集成。
+  
 use_cases:
   - "初始化 TLF35584 并通过 SPI 16 位帧（奇校验）验证器件 ID"
   - "配置 TLF35584 电源轨（VCORE/VKAM/VCC1/VCC2）输出电压与上电序列"

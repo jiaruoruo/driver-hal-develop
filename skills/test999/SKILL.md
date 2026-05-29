@@ -5,10 +5,9 @@ category: communication-driver
 domain: automotive
 subcategory: test999
 
-description: >
-  专注于 Test999 驱动开发，覆盖初始化配置、数据收发、
+description: 专注于 Test999 驱动开发，覆盖初始化配置、数据收发、
   故障检测与保护机制，确保满足 AUTOSAR 规范与 ISO 26262 功能安全要求。
-
+  
 use_cases:
   - "初始化 Test999 并完成基础配置"
   - "配置 Test999 输出参数与工作模式"

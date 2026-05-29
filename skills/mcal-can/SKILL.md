@@ -1,15 +1,13 @@
 ---
-name: can
+name: mcal-can
 version: "1.0.0"
 category: communication-driver
 domain: automotive
 subcategory: can-bus
 
-description: >
-  专注于车载 CAN/CANFD 总线底层驱动开发，覆盖波特率配置、报文过滤器设置、
-  收发缓冲区管理、总线错误处理与 AUTOSAR CanDrv 规范实现，
-  确保 CAN 驱动满足车规实时性要求并符合 ISO 11898 与 AUTOSAR 规范。
+description: 专注于车载 CAN/CANFD 总线底层驱动开发，覆盖波特率配置、报文过滤器设置、收发缓冲区管理、总线错误处理与 AUTOSAR CanDrv 规范实现，确保 CAN 驱动满足车规实时性要求并符合 ISO 11898 与 AUTOSAR 规范。
 
+  
 use_cases:
   - "配置 CAN/CANFD 控制器波特率（仲裁段 + 数据段）"
   - "设置硬件报文过滤器（ID 掩码/列表模式）"

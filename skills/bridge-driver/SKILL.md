@@ -5,10 +5,8 @@ category: actuator-driver
 domain: automotive
 subcategory: motor-control
 
-description: >
-  专注于车规级 H 桥与半桥驱动芯片（DRV8xxx/L9xxx/NCV7xxx）的底层驱动开发，
-  覆盖 PWM 调速、电机正反转控制、软启停及过流/过温/欠压故障保护机制，
-  确保驱动代码符合 AUTOSAR 规范与 ISO 26262 功能安全要求。
+description: 专注于车规级 H 桥与半桥驱动芯片（DRV8xxx/L9xxx/NCV7xxx）的底层驱动开发，覆盖 PWM 调速、电机正反转控制、软启停及过流/过温/欠压故障保护机制，确保驱动代码符合 AUTOSAR 规范与 ISO 26262 功能安全要求。
+ 
 
 use_cases:
   - "初始化 H 桥/半桥驱动芯片并配置 SPI 控制参数"

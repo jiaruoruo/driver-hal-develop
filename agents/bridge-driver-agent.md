@@ -108,6 +108,8 @@ skills:
     proficiency: advanced
   - skill: mcu
     proficiency: intermediate
+  - skill: skills/test888/SKILL.md
+    proficiency: advanced
 ```
 
 ---

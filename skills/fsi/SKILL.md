@@ -5,11 +5,9 @@ category: safety-driver
 domain: automotive
 subcategory: functional-safety-interface
 
-description: >
-  专注于 FSI（Functional Safety Interface）功能安全接口通信驱动开发，
-  覆盖 FSI 帧结构实现、CRC-8 校验、帧发送/接收状态机及安全监控集成，
-  确保 FSI 通信满足 ISO 26262 ASIL-D 功能安全要求。
-
+description: 专注于 FSI（Functional Safety Interface）功能安全接口通信驱动开发，
+  覆盖 FSI 帧结构实现、CRC-8 校验、帧发送/接收状态机及安全监控集成，确保 FSI 通信满足 ISO 26262 ASIL-D 功能安全要求。
+  
 use_cases:
   - "实现 FSI 帧封装与 CRC-8 校验计算（AUTOSAR E2E Profile 1/4/5）"
   - "开发 FSI 周期性帧发送状态机（发送序列、计数器、超时检测）"

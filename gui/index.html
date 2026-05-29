@@ -941,6 +941,426 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
 .modal-maximize-btn:hover{
   border-color:var(--ca);color:var(--ca);background:rgba(56,139,253,.08)
 }
+/* ── Skills 侧边目录 & 弹出卡片 ─────────────────────────────── */
+.skills-layout{display:flex;height:100%;overflow:hidden}
+.skills-sidebar{
+  width:164px;flex-shrink:0;display:flex;flex-direction:column;
+  overflow:hidden;background:var(--bg);padding:0;min-width:100px;max-width:340px
+}
+.skills-sidebar .sb-hdr{
+  font-size:9px;font-weight:700;color:var(--tx-m);
+  text-transform:uppercase;letter-spacing:.8px;padding:8px 12px 4px;flex-shrink:0
+}
+/* 搜索框 */
+.sb-search-wrap{padding:0 8px 6px;flex-shrink:0}
+.sb-search{
+  width:100%;background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:5px;padding:5px 8px;color:var(--tx-p);font-size:11px;
+  font-family:inherit;outline:none;transition:.15s
+}
+.sb-search:focus{border-color:var(--cs);box-shadow:0 0 0 2px rgba(63,185,80,.12)}
+.sb-search::placeholder{color:var(--tx-m)}
+/* 可滚动目录列表 */
+.sb-items{overflow-y:auto;flex:1}
+/* 拖拽调宽手柄 */
+.sb-resize-handle{
+  width:5px;flex-shrink:0;cursor:col-resize;
+  background:transparent;border-left:1px solid var(--border);
+  transition:background .15s;z-index:5
+}
+.sb-resize-handle:hover,.sb-resize-handle.dragging{
+  background:rgba(63,185,80,.22);border-left-color:var(--cs)
+}
+.skills-sidebar-item{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 10px;cursor:pointer;font-size:11px;
+  color:var(--tx-s);border-left:2px solid transparent;
+  transition:.15s;user-select:none;white-space:nowrap;overflow:hidden
+}
+.skills-sidebar-item:hover{color:var(--tx-p);background:var(--bg-card2);border-left-color:var(--cs)}
+.skills-sidebar-item.sb-active{color:var(--cs);border-left-color:var(--cs);background:#1a332720}
+.skills-sidebar-item .sb-name{flex:1;overflow:hidden;text-overflow:ellipsis;font-size:11px}
+.sb-sep{height:1px;background:var(--border);margin:4px 0}
+.skills-sidebar-add{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 12px;cursor:pointer;font-size:11px;font-weight:700;
+  color:var(--cs);border:1px dashed #3fb95040;
+  margin:6px 8px;border-radius:6px;transition:.15s
+}
+.skills-sidebar-add:hover{background:#1a332730;border-color:var(--cs)}
+/* 紧凑卡片（默认收起状态） */
+.ccard.ccard-compact{padding:8px 10px 6px}
+.ccard.ccard-compact .ccard-role,
+.ccard.ccard-compact .ccard-path,
+.ccard.ccard-compact .ccard-extra,
+.ccard.ccard-compact .chip-row{display:none}
+.ccard.ccard-compact .ccard-actions{margin-bottom:0}
+/* Skill 弹出预览卡 */
+#skill-hover-popup{
+  position:fixed;z-index:650;pointer-events:none;
+  opacity:0;transition:opacity .15s ease;
+  min-width:270px;max-width:360px;
+  background:var(--bg-card);border:1px solid var(--cs);
+  border-radius:var(--r);padding:12px 14px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  font-size:12px;color:var(--tx-p)
+}
+#skill-hover-popup.sp-visible{opacity:1}
+.sp-title{font-size:13px;font-weight:700;margin-bottom:6px;
+  display:flex;align-items:center;gap:6px}
+.sp-cat{font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;
+  background:#1a3327;color:var(--cs);border:1px solid #3fb95040}
+.sp-desc{font-size:11px;color:var(--tx-s);line-height:1.6;margin-bottom:8px}
+.sp-row{display:flex;align-items:center;gap:6px;font-size:10px;
+  color:var(--tx-m);margin-bottom:3px}
+.sp-row b{color:var(--tx-s);font-weight:600}
+.sp-actions{display:flex;gap:6px;margin-top:8px;border-top:1px solid var(--border);padding-top:8px}
+.sp-btn{
+  background:var(--bg-card2);border:1px solid var(--border);
+  color:var(--tx-s);padding:4px 12px;border-radius:5px;cursor:pointer;
+  font-size:11px;font-weight:600;transition:.15s;pointer-events:auto
+}
+.sp-btn:hover{border-color:var(--cs);color:var(--cs)}
+.sp-btn-del:hover{border-color:var(--cr);color:var(--cr)}
+
+/* ═══════════════════ PROJECT CONFIG VIEW ═══════════════════ */
+/* 视图切换按钮 */
+.btn-view{
+  background:var(--bg-card2);border:1px solid var(--border);color:var(--tx-s);
+  padding:5px 12px;border-radius:var(--r);cursor:pointer;font-size:12px;
+  transition:.2s;display:flex;align-items:center;gap:5px;font-weight:600
+}
+.btn-view:hover{border-color:var(--ca);color:var(--ca)}
+.btn-view.active{background:#1f3358;border-color:#388bfd60;color:var(--ca)}
+
+/* 主视图容器 */
+#project-config-view{
+  display:none;flex:1;overflow:hidden;flex-direction:row;
+}
+#project-config-view.visible{display:flex}
+
+/* ── 左侧边栏 ── */
+#pc-sidebar{
+  width:280px;min-width:200px;max-width:400px;
+  display:flex;flex-direction:column;
+  background:var(--bg-card);border-right:1px solid var(--border);
+  overflow:hidden;flex-shrink:0;
+}
+.pc-sb-resize{
+  width:4px;background:transparent;cursor:col-resize;flex-shrink:0;
+  transition:.15s;
+}
+.pc-sb-resize:hover{background:var(--ca)}
+
+/* 侧边栏区块 */
+.pc-sb-section{
+  display:flex;flex-direction:column;overflow:hidden;
+  border-bottom:1px solid var(--border);flex-shrink:0
+}
+.pc-sb-section.expandable{flex:1;overflow:hidden}
+.pc-sb-hdr{
+  display:flex;align-items:center;gap:6px;padding:8px 10px;
+  background:var(--bg-card2);cursor:pointer;user-select:none;
+  font-size:11px;font-weight:700;color:var(--tx-s);letter-spacing:.5px;
+  flex-shrink:0;
+}
+.pc-sb-hdr:hover{color:var(--tx-p)}
+.pc-sb-hdr .sb-icon{font-size:13px}
+.pc-sb-hdr .sb-title{flex:1}
+.pc-sb-hdr .sb-count{
+  background:var(--bg);border:1px solid var(--border);
+  color:var(--tx-m);padding:1px 5px;border-radius:8px;font-size:10px
+}
+.pc-sb-hdr .sb-toggle{font-size:10px;color:var(--tx-m);transition:.2s}
+.pc-sb-hdr.collapsed .sb-toggle{transform:rotate(-90deg)}
+.pc-sb-body{
+  overflow-y:auto;flex:1;padding:4px 0
+}
+.pc-sb-body.collapsed{display:none !important}
+.pc-sb-section.collapsed{flex:0 0 auto !important;min-height:0 !important}
+
+/* 项目列表条目 */
+.pc-proj-item{
+  display:flex;align-items:center;gap:6px;padding:6px 12px;
+  cursor:pointer;border-left:3px solid transparent;transition:.15s;
+  font-size:12px;
+}
+.pc-proj-item:hover{background:var(--bg-card2)}
+.pc-proj-item.active{background:#1a2540;border-left-color:var(--ca);color:var(--ca)}
+.pc-proj-item .proj-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-proj-item .proj-del{
+  opacity:0;color:var(--cr);cursor:pointer;font-size:11px;padding:1px 4px;
+  border-radius:3px;transition:.15s;flex-shrink:0
+}
+.pc-proj-item:hover .proj-del{opacity:.6}
+.pc-proj-item .proj-del:hover{opacity:1;background:#3d1f1f}
+
+/* 项目操作按钮区 */
+.pc-proj-actions{
+  display:flex;gap:6px;padding:6px 10px;
+  border-top:1px solid var(--border);flex-shrink:0
+}
+.pc-action-btn{
+  flex:1;padding:4px 6px;background:var(--bg-card2);
+  border:1px solid var(--border);border-radius:5px;
+  color:var(--tx-s);font-size:11px;cursor:pointer;transition:.2s;
+  display:flex;align-items:center;justify-content:center;gap:3px
+}
+.pc-action-btn:hover{border-color:var(--ca);color:var(--ca)}
+
+/* 文件树 */
+.pc-tree-node{
+  display:flex;align-items:center;gap:4px;padding:2px 0 2px 4px;
+  cursor:pointer;border-radius:4px;font-size:12px;transition:.15s;
+  user-select:none;
+}
+.pc-tree-node:hover{background:var(--bg-card2)}
+.pc-tree-node.selected{background:#1a2540;color:var(--ca)}
+.pc-tree-node .tree-indent{display:inline-block;width:16px;flex-shrink:0}
+.pc-tree-node .tree-icon{font-size:13px;flex-shrink:0;width:18px}
+.pc-tree-node .tree-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-tree-node .tree-actions{
+  display:none;gap:2px;margin-right:4px;align-items:center
+}
+.pc-tree-node:hover .tree-actions{display:flex}
+.tree-action-btn{
+  color:var(--tx-m);cursor:pointer;padding:1px 3px;border-radius:3px;
+  font-size:11px;transition:.15s
+}
+.tree-action-btn:hover{color:var(--tx-p);background:var(--bg)}
+
+/* Agent/Skill 搜索框 */
+.pc-search-wrap{
+  padding:6px 8px;border-bottom:1px solid var(--border);flex-shrink:0
+}
+.pc-search-input{
+  width:100%;padding:5px 8px;background:var(--bg);
+  border:1px solid var(--border);border-radius:5px;
+  color:var(--tx-p);font-size:11px;outline:none;transition:.2s
+}
+.pc-search-input:focus{border-color:var(--ca)}
+
+/* Agent/Skill 列表条目 */
+.pc-list-item{
+  display:flex;align-items:center;gap:6px;padding:5px 10px;
+  cursor:pointer;transition:.15s;font-size:12px;
+  border-left:2px solid transparent;
+}
+.pc-list-item:hover{background:var(--bg-card2)}
+.pc-list-item.agent-item{border-left-color:transparent}
+.pc-list-item.agent-item:hover{border-left-color:var(--ca)}
+.pc-list-item.skill-item{border-left-color:transparent}
+.pc-list-item.skill-item:hover{border-left-color:var(--cs)}
+.pc-list-item .item-icon{font-size:13px;flex-shrink:0}
+.pc-list-item .item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-list-item .item-del{
+  opacity:0;color:var(--cr);cursor:pointer;font-size:11px;
+  padding:1px 4px;border-radius:3px;flex-shrink:0;transition:.15s
+}
+.pc-list-item:hover .item-del{opacity:.6}
+.pc-list-item .item-del:hover{opacity:1!important;background:#3d1f1f}
+
+/* ── 主内容区 ── */
+#pc-main{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--bg)
+}
+.pc-toolbar{
+  display:flex;align-items:center;gap:6px;padding:8px 12px;
+  background:var(--bg-card);border-bottom:1px solid var(--border);
+  flex-shrink:0;flex-wrap:wrap
+}
+.pc-toolbar-sep{width:1px;height:18px;background:var(--border)}
+.pc-tb-btn{
+  padding:5px 10px;background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:5px;color:var(--tx-s);font-size:12px;cursor:pointer;
+  transition:.2s;display:flex;align-items:center;gap:4px;white-space:nowrap
+}
+.pc-tb-btn:hover{border-color:var(--ca);color:var(--ca)}
+.pc-tb-btn.agent-btn:hover{border-color:var(--ca);color:var(--ca)}
+.pc-tb-btn.skill-btn:hover{border-color:var(--cs);color:var(--cs)}
+.pc-tb-btn.danger-btn:hover{border-color:var(--cr);color:var(--cr)}
+.pc-tb-file-path{
+  flex:1;font-size:11px;color:var(--tx-s);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:monospace;padding:0 6px
+}
+
+/* 文件编辑器 */
+#pc-editor-wrap{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative
+}
+#pc-editor{
+  flex:1;width:100%;padding:14px 16px;
+  background:var(--bg-card);color:var(--tx-p);
+  border:none;outline:none;resize:none;
+  font-family:'Cascadia Code','Consolas','Courier New',monospace;
+  font-size:13px;line-height:1.6;
+  overflow-y:auto;
+}
+#pc-editor-footer{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;
+  background:var(--bg-card2);border-top:1px solid var(--border);
+  flex-shrink:0
+}
+.pc-save-btn{
+  padding:5px 16px;background:#1f3358;border:1px solid #388bfd60;
+  border-radius:5px;color:var(--ca);font-size:12px;cursor:pointer;
+  transition:.2s;font-weight:600
+}
+.pc-save-btn:hover{background:#264270;border-color:var(--ca)}
+.pc-save-status{font-size:11px;color:var(--tx-m)}
+
+/* 项目概览卡片 */
+#pc-overview{
+  flex:1;overflow-y:auto;padding:20px;
+  display:flex;flex-direction:column;gap:16px;
+}
+.pc-overview-title{
+  font-size:16px;font-weight:700;color:var(--tx-p);
+  display:flex;align-items:center;gap:8px
+}
+.pc-overview-meta{font-size:12px;color:var(--tx-s)}
+.pc-stat-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px
+}
+.pc-stat-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px 14px;
+}
+.pc-stat-label{font-size:11px;color:var(--tx-m);margin-bottom:4px}
+.pc-stat-value{font-size:22px;font-weight:700;color:var(--tx-p)}
+.pc-stat-card.agents .pc-stat-value{color:var(--ca)}
+.pc-stat-card.skills .pc-stat-value{color:var(--cs)}
+.pc-stat-card.files .pc-stat-value{color:var(--cc)}
+.pc-empty-state{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px;color:var(--tx-m);padding:40px
+}
+.pc-empty-icon{font-size:48px;opacity:.5}
+.pc-empty-title{font-size:15px;color:var(--tx-s)}
+.pc-empty-hint{font-size:12px;text-align:center;line-height:1.6}
+.pc-empty-actions{display:flex;gap:8px;margin-top:8px}
+
+/* ── Project Config Modals ── */
+.pc-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.65);
+  display:flex;align-items:center;justify-content:center;
+  z-index:500;backdrop-filter:blur(3px)
+}
+.pc-modal-overlay.hidden{display:none}
+.pc-modal-box{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:10px;width:500px;max-width:96vw;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden
+}
+.pc-modal-hdr{
+  display:flex;align-items:center;gap:8px;padding:14px 16px;
+  border-bottom:1px solid var(--border);background:var(--bg-card2)
+}
+.pc-modal-title{font-size:14px;font-weight:700;flex:1;color:var(--tx-p)}
+.pc-modal-close{
+  background:none;border:none;color:var(--tx-m);cursor:pointer;
+  font-size:16px;padding:2px 6px;border-radius:4px;transition:.2s
+}
+.pc-modal-close:hover{color:var(--cr);background:#3d1f1f}
+.pc-modal-body{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.pc-form-group{display:flex;flex-direction:column;gap:5px}
+.pc-form-label{font-size:12px;color:var(--tx-s);font-weight:600}
+.pc-form-input{
+  padding:7px 10px;background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;color:var(--tx-p);font-size:12px;outline:none;transition:.2s
+}
+.pc-form-input:focus{border-color:var(--ca)}
+.pc-form-hint{font-size:11px;color:var(--tx-m)}
+.pc-form-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:8px}
+.pc-form-tab{
+  padding:6px 14px;background:none;border:none;cursor:pointer;
+  font-size:12px;font-weight:600;color:var(--tx-m);
+  border-bottom:2px solid transparent;transition:.2s
+}
+.pc-form-tab.active{color:var(--ca);border-bottom-color:var(--ca)}
+.pc-form-tab-panel{display:none}
+.pc-form-tab-panel.active{display:flex;flex-direction:column;gap:10px}
+.pc-modal-footer{
+  display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;
+  border-top:1px solid var(--border);background:var(--bg-card2)
+}
+.pc-btn-cancel{
+  padding:6px 14px;background:var(--bg-card2);border:1px solid var(--border);
+  border-radius:6px;color:var(--tx-s);font-size:12px;cursor:pointer;transition:.2s
+}
+.pc-btn-cancel:hover{border-color:var(--tx-s);color:var(--tx-p)}
+.pc-btn-primary{
+  padding:6px 16px;background:#1f3358;border:1px solid #388bfd60;
+  border-radius:6px;color:var(--ca);font-size:12px;cursor:pointer;
+  transition:.2s;font-weight:600
+}
+.pc-btn-primary:hover{background:#264270;border-color:var(--ca)}
+.pc-btn-danger{
+  padding:6px 14px;background:#3d1f1f;border:1px solid #f8514940;
+  border-radius:6px;color:var(--cr);font-size:12px;cursor:pointer;
+  transition:.2s;font-weight:600
+}
+.pc-btn-danger:hover{background:#521f1f;border-color:var(--cr)}
+.pc-danger-zone{
+  background:#1a0f0f;border:1px solid #f8514930;border-radius:6px;
+  padding:10px 12px;font-size:12px;color:var(--tx-s)
+}
+.pc-loading-spinner{
+  display:inline-block;width:14px;height:14px;border:2px solid var(--border);
+  border-top-color:var(--ca);border-radius:50%;animation:spin .6s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+
+/* pool item */
+.pc-pool-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:4px;margin-bottom:2px;cursor:pointer;border:1px solid transparent;background:var(--bg);transition:.15s}
+.pc-pool-item:hover{background:var(--bg-card2)}
+.pc-pool-item.selected{background:#1f335840 !important;border-color:var(--ca) !important}
+.pc-pool-item-name{font-size:12px;font-weight:600;color:var(--tx-p);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-pool-item-desc{font-size:10px;color:var(--tx-m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Agent tooltip chip 样式 ── */
+.pc-tt-chip{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.pc-tt-chip-s{background:#1a3a2a;color:#5db87a;border:1px solid #2d5a40}
+.pc-tt-chip-t{background:#1a2a3a;color:#5a8ab8;border:1px solid #2a4060}
+.pc-tt-chip-r{background:#3a2010;color:#c87840;border:1px solid #5a3820}
+.pc-tt-chip-k{background:#2a1a3a;color:#9a60c8;border:1px solid #4a2a60}
+/* ── Skill tooltip ── */
+#pc-skill-tooltip{pointer-events:none}
+.pc-sk-tt-chip{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.pc-sk-tt-chip-cat{background:#1a3327;color:#5db87a;border:1px solid #2d5a40}
+.pc-sk-tt-chip-std{background:#3d2e00;color:#c87840;border:1px solid #5a3820}
+.pc-sk-tt-chip-uc{background:#1a2a3a;color:#5a8ab8;border:1px solid #2a4060}
+
+/* ── CLI Scanner dropdown ── */
+#pc-cli-dropdown{position:absolute;top:calc(100% + 4px);left:0;min-width:260px;
+  background:#0d1b2e;border:1px solid #2a4a7a;border-radius:8px;padding:6px 0;
+  z-index:310;box-shadow:0 8px 32px rgba(0,0,0,.75)}
+.pc-cli-item{display:flex;align-items:center;gap:9px;padding:7px 12px;cursor:pointer;
+  font-size:11px;color:var(--tx-p);transition:.15s;white-space:nowrap}
+.pc-cli-item:hover{background:#1a2a3a}
+.pc-cli-item.selected{background:#1f335820;color:var(--cs)}
+.pc-cli-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pc-cli-st-installed{background:#3fb950;box-shadow:0 0 5px #3fb95080}
+.pc-cli-st-found{background:#d29922}
+.pc-cli-st-config_found{background:#388bfd}
+.pc-cli-st-not_found{background:#484f58}
+/* ── Copy files modal ── */
+#pc-copy-modal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:960;
+  display:none;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+#pc-copy-modal.open{display:flex}
+.pc-copy-row{display:flex;align-items:center;gap:8px;padding:6px 8px;
+  border-radius:6px;background:var(--bg-card2);border:1px solid var(--border);transition:.15s}
+.pc-copy-row:hover{border-color:#388bfd40}
+.pc-copy-row.conflict{border-color:#d2992260;background:#3d2e0015}
+.pc-copy-ft{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;flex-shrink:0}
+.pc-ft-agent{background:#1f3358;color:var(--ca)}
+.pc-ft-skill{background:#1a3327;color:var(--cs)}
+.pc-ft-tool{background:#3d2e00;color:var(--ct)}
+.pc-ft-knowledge{background:#2d1f4e;color:var(--ck)}
+.pc-ft-rule{background:#3d1f1f;color:var(--cr)}
 </style>
 </head>
 <body>
@@ -959,6 +1379,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
     <span>Embedded Software Develop Agents Team</span>
   </div>
   <div class="spacer"></div>
+  <!-- 视图切换 -->
+  <button class="btn-view active" id="btn-view-route" onclick="switchMainView('route')" title="开发资源池">🗃 开发资源池</button>
+  <button class="btn-view" id="btn-view-project" onclick="switchMainView('project')" title="项目管理">🗂 项目管理</button>
+  <div style="width:1px;height:18px;background:var(--border);margin:0 4px"></div>
   <div class="conn off" id="conn">
     <div class="dot"></div>
     <span id="conn-txt">连接中…</span>
@@ -988,7 +1412,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
       </button>
     </div>
     <div id="tab-agents"    class="tab-panel active"><div class="cards" id="cards-agents"></div></div>
-    <div id="tab-skills"    class="tab-panel"><div class="cards" id="cards-skills"></div></div>
+    <div id="tab-skills"    class="tab-panel" style="padding:0;overflow:hidden">
+      <div class="skills-layout">
+        <div class="skills-sidebar" id="sidebar-skills"></div>
+        <div class="sb-resize-handle" id="sb-resize-handle"></div>
+        <div style="flex:1;overflow-y:auto;padding:12px 14px">
+          <div class="cards" id="cards-skills"></div>
+        </div>
+      </div>
+    </div>
     <div id="tab-rules"     class="tab-panel"><div class="cards" id="cards-rules"></div></div>
     <div id="tab-knowledge" class="tab-panel"><div class="cards" id="cards-knowledge"></div></div>
     <div id="tab-tools"     class="tab-panel"><div class="cards" id="cards-tools"></div></div>
@@ -1033,7 +1465,595 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
     </div>
   </section>
 
+  <!-- ══════════════════════════════════════════════════════════
+       PROJECT CONFIG VIEW
+  ══════════════════════════════════════════════════════════ -->
+  <div id="project-config-view">
+
+    <!-- 左侧边栏 -->
+    <div id="pc-sidebar">
+
+      <!-- 项目列表区块 -->
+      <div class="pc-sb-section" style="flex-shrink:0">
+        <div class="pc-sb-hdr" onclick="pcToggleSection('proj-body')">
+          <span class="sb-icon">📁</span>
+          <span class="sb-title">项目列表</span>
+          <span class="sb-count" id="pc-proj-count">0</span>
+          <span class="sb-toggle" id="pc-proj-toggle">▾</span>
+        </div>
+        <div class="pc-sb-body" id="proj-body">
+          <div id="pc-proj-list"></div>
+        </div>
+        <div class="pc-proj-actions">
+          <button class="pc-action-btn" onclick="pcShowCreateModal()" title="新建项目">➕ 新建</button>
+          <button class="pc-action-btn" onclick="pcShowOpenModal()" title="导入本地项目">📂 导入</button>
+        </div>
+      </div>
+
+      <!-- 目录树区块（隐藏，仅保留DOM供JS使用） -->
+      <div style="display:none">
+        <div id="pc-file-tree"></div>
+      </div>
+
+      <!-- Agents 列表 -->
+      <div class="pc-sb-section" style="flex:1;overflow:hidden;min-height:80px">
+        <div class="pc-sb-hdr" onclick="pcToggleSection('agents-body')">
+          <span class="sb-icon">🤖</span>
+          <span class="sb-title">Agents</span>
+          <span class="sb-count" id="pc-agents-count">0</span>
+          <span class="sb-toggle" id="pc-agents-toggle">▾</span>
+        </div>
+        <div class="pc-sb-body" id="agents-body" style="display:flex;flex-direction:column">
+          <div class="pc-search-wrap">
+            <input class="pc-search-input" id="pc-agent-search" placeholder="🔍 搜索 Agent..."
+              oninput="pcFilterList('agent')" autocomplete="off">
+          </div>
+          <div id="pc-agents-list" style="flex:1;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Skills 列表 -->
+      <div class="pc-sb-section" style="flex:1;overflow:hidden;min-height:80px">
+        <div class="pc-sb-hdr" onclick="pcToggleSection('skills-body')">
+          <span class="sb-icon">🛠</span>
+          <span class="sb-title">Skills</span>
+          <span class="sb-count" id="pc-skills-count">0</span>
+          <span class="sb-toggle" id="pc-skills-toggle">▾</span>
+        </div>
+        <div class="pc-sb-body" id="skills-body" style="display:flex;flex-direction:column">
+          <div class="pc-search-wrap">
+            <input class="pc-search-input" id="pc-skill-search" placeholder="🔍 搜索 Skill..."
+              oninput="pcFilterList('skill')" autocomplete="off">
+          </div>
+          <div id="pc-skills-list" style="flex:1;overflow-y:auto"></div>
+        </div>
+      </div>
+
+    </div><!-- /pc-sidebar -->
+
+    <!-- 侧边栏拖拽调宽手柄 -->
+    <div class="pc-sb-resize" id="pc-sb-resize-handle"></div>
+
+    <!-- 右侧主内容区 -->
+    <div id="pc-main">
+
+      <!-- 工具栏 -->
+      <div class="pc-toolbar" id="pc-toolbar">
+        <button class="pc-tb-btn" onclick="pcNewFile()" id="pc-btn-newfile" disabled title="新建文件（需先选择项目）">📄 新建文件</button>
+        <button class="pc-tb-btn" onclick="pcNewDir()" id="pc-btn-newdir" disabled title="新建目录">📁 新建目录</button>
+        <div class="pc-toolbar-sep"></div>
+        <button class="pc-tb-btn agent-btn" onclick="pcShowAddAgentModal()" id="pc-btn-add-agent" disabled title="添加 Agent">🤖 添加 Agent</button>
+        <button class="pc-tb-btn skill-btn" onclick="pcShowAddSkillModal()" id="pc-btn-add-skill" disabled title="添加 Skill">🛠 添加 Skill</button>
+        <div class="pc-toolbar-sep"></div>
+        <span class="pc-tb-file-path" id="pc-current-path">未选择项目</span>
+      </div>
+
+      <!-- 编辑器包裹（文件打开时显示） -->
+      <div id="pc-editor-wrap" style="display:none">
+        <textarea id="pc-editor" spellcheck="false"
+          placeholder="文件内容将在此显示..."
+          oninput="pcMarkEditorDirty()"></textarea>
+        <div id="pc-editor-footer">
+          <button class="pc-save-btn" id="pc-editor-save-btn" onclick="pcSaveFile()">💾 保存</button>
+          <span id="pc-editor-readonly-hint" style="display:none;font-size:11px;color:#d29922;background:#3d2e00;border:1px solid #d2992240;padding:2px 10px;border-radius:4px;flex-shrink:0">🔒 只读 · 如需编辑请在开发资源池中操作</span>
+          <span class="pc-save-status" id="pc-save-status"></span>
+          <div style="flex:1"></div>
+          <button class="pc-tb-btn danger-btn" onclick="pcCloseFile()" style="font-size:11px;padding:4px 10px">✕ 关闭</button>
+        </div>
+      </div>
+
+      <!-- 项目概览（无文件打开时显示） -->
+      <div id="pc-overview">
+        <div class="pc-empty-state" id="pc-no-project-state">
+          <div class="pc-empty-icon">🗂</div>
+          <div class="pc-empty-title">项目配置中心</div>
+          <div class="pc-empty-hint">
+            创建新项目或导入已有本地目录<br>
+            支持管理项目内的 Agent、Skill 文件
+          </div>
+          <div class="pc-empty-actions">
+            <button class="pc-btn-primary" onclick="pcShowCreateModal()">➕ 新建项目</button>
+            <button class="pc-btn-cancel" onclick="pcShowOpenModal()">📂 导入项目</button>
+          </div>
+        </div>
+        <div id="pc-project-overview" style="display:none">
+          <div class="pc-overview-title" id="pc-overview-name">📦 项目名称</div>
+          <div class="pc-overview-meta" id="pc-overview-meta"></div>
+          <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <!-- CLI Scanner button + dropdown -->
+            <div style="position:relative">
+              <button id="pc-btn-scan-cli" onclick="pcToggleCLIScanner()" title="扫描并选择本地 AI CLI 运行时工具"
+                onmouseover="this.style.borderColor='#2a5a8a';this.style.color='#7aaecc'"
+                onmouseout="this.style.borderColor='#1a3a5a';this.style.color='#4a7098'"
+                style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;font-size:11px;
+                font-weight:600;background:var(--bg-card2);border:1px solid #1a3a5a;border-radius:6px;
+                color:#4a7098;cursor:pointer;transition:all .2s;white-space:nowrap">
+                <span style="font-size:11px">🔍</span>
+                <span>运行时 CLI</span>
+                <span id="pc-cli-sel-label" style="color:#5de070;font-size:10px;
+                  white-space:nowrap;display:none"></span>
+                <span style="font-size:9px;opacity:.5">▼</span>
+              </button>
+              <div id="pc-cli-dropdown" style="display:none">
+                <div style="padding:7px 12px 5px;font-size:10px;font-weight:700;color:var(--tx-m);
+                  display:flex;align-items:center;gap:6px;border-bottom:1px solid #1e3050">
+                  <span>本地 CLI 工具</span>
+                  <button onclick="pcScanCLI()" style="margin-left:auto;background:#132235;
+                    border:1px solid #2a4a7a;color:#5a8ab8;padding:2px 8px;border-radius:4px;
+                    cursor:pointer;font-size:10px;transition:.15s"
+                    onmouseover="this.style.background='#1a3050'"
+                    onmouseout="this.style.background='#132235'">
+                    🔄 重新扫描
+                  </button>
+                </div>
+                <div id="pc-cli-list" style="max-height:240px;overflow-y:auto;padding:4px 0">
+                  <div style="padding:14px;text-align:center;color:var(--tx-m);font-size:11px">
+                    正在检测本地 CLI…
+                  </div>
+                </div>
+                <div style="padding:6px 12px;border-top:1px solid #1e3050;font-size:10px;color:var(--tx-m)">
+                  <span id="pc-cli-none-opt"
+                    onclick="pcSelectCLI(null,null,null)"
+                    style="cursor:pointer;color:#5a8ab8"
+                    onmouseover="this.style.color='#89afd4'"
+                    onmouseout="this.style.color='#5a8ab8'">
+                    ✕ 取消选择 CLI
+                  </span>
+                </div>
+              </div>
+            </div>
+            <!-- 组建团队按钮 -->
+            <button id="pc-btn-team" onclick="pcShowTeamModal()" title="管理本项目的 Agents 和 Skills"
+              onmouseover="this.style.borderColor='#3a7bd5';this.style.color='#89afd4'"
+              onmouseout="this.style.borderColor='#243d5c';this.style.color='#5a84a8'"
+              style="display:inline-flex;align-items:center;gap:6px;
+              padding:6px 14px;font-size:12px;font-weight:600;letter-spacing:0.4px;
+              background:var(--bg-card2);
+              border:1px solid #243d5c;border-radius:6px;
+              color:#5a84a8;cursor:pointer;transition:all .2s;">
+              <span style="font-size:13px;opacity:.8">⬡</span> 组建项目团队
+            </button>
+          </div>
+          <div class="pc-stat-grid" id="pc-stat-grid" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+    </div><!-- /pc-main -->
+
+  </div><!-- /project-config-view -->
+
 </div>
+
+<!-- ═══════════════════════════════════════════
+     PROJECT CONFIG MODALS
+═══════════════════════════════════════════ -->
+
+<!-- 创建项目 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-create-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>➕</span>
+      <span class="pc-modal-title">新建项目</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-create-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div class="pc-form-group">
+        <label class="pc-form-label">项目名称 *</label>
+        <input class="pc-form-input" id="pc-create-name" placeholder="例如：my-hal-project"
+          autocomplete="off" onkeydown="if(event.key==='Enter')pcDoCreate()">
+        <span class="pc-form-hint">建议使用小写字母、数字和连字符</span>
+      </div>
+      <div class="pc-form-group">
+        <label class="pc-form-label">父目录 *</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input class="pc-form-input" id="pc-create-path" placeholder="例如：D:/projects（选择父目录）"
+            autocomplete="off" onkeydown="if(event.key==='Enter')pcDoCreate()" style="flex:1">
+          <button class="pc-tb-btn" onclick="pcBrowse('pc-create-path','dir')" title="浏览文件夹" style="padding:6px 10px;flex-shrink:0">📂</button>
+        </div>
+        <span class="pc-form-hint">将在此父目录下自动创建以项目名命名的空文件夹</span>
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-create-modal')">取消</button>
+      <button class="pc-btn-primary" onclick="pcDoCreate()">➕ 创建项目</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入项目 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-open-modal">
+  <div class="pc-modal-box" style="width:min(520px,96vw)">
+    <div class="pc-modal-hdr">
+      <span>📂</span>
+      <span class="pc-modal-title" id="pc-open-modal-title">导入/下载项目</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-open-modal')">✕</button>
+    </div>
+    <!-- Tab 切换 -->
+    <div style="display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid var(--bd)">
+      <button class="pc-form-tab active" id="pc-open-tab-local"
+        onclick="pcSwitchOpenTab('local')" style="flex:1">📁 本地导入</button>
+      <button class="pc-form-tab" id="pc-open-tab-github"
+        onclick="pcSwitchOpenTab('github')" style="flex:1">🌐 GitHub 下载</button>
+    </div>
+    <!-- Tab: 本地导入 -->
+    <div class="pc-form-tab-panel active" id="pc-open-panel-local">
+      <div class="pc-modal-body">
+        <div class="pc-form-group">
+          <label class="pc-form-label">本地目录路径 *</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="pc-form-input" id="pc-open-path" placeholder="例如：D:/projects/my-hal-project"
+              autocomplete="off" onkeydown="if(event.key==='Enter')pcDoOpen()" style="flex:1">
+            <button class="pc-tb-btn" onclick="pcBrowse('pc-open-path','dir')" title="浏览文件夹" style="padding:6px 10px;flex-shrink:0">📂</button>
+          </div>
+          <span class="pc-form-hint">指向已有的项目目录，将自动识别 agents/skills 等子目录</span>
+        </div>
+      </div>
+      <div class="pc-modal-footer">
+        <button class="pc-btn-cancel" onclick="pcHideModal('pc-open-modal')">取消</button>
+        <button class="pc-btn-primary" onclick="pcDoOpen()">📂 导入项目</button>
+      </div>
+    </div>
+    <!-- Tab: GitHub 下载 -->
+    <div class="pc-form-tab-panel" id="pc-open-panel-github">
+      <div class="pc-modal-body">
+        <div class="pc-form-group">
+          <label class="pc-form-label">GitHub 仓库 URL *</label>
+          <input class="pc-form-input" id="pc-from-github-url"
+            placeholder="例如：https://github.com/user/repo"
+            autocomplete="off">
+          <span class="pc-form-hint">支持完整仓库或子路径，例如 https://github.com/user/repo/tree/main/src</span>
+        </div>
+        <div class="pc-form-group">
+          <label class="pc-form-label">项目名称（可选）</label>
+          <input class="pc-form-input" id="pc-from-github-name"
+            placeholder="默认使用仓库名"
+            autocomplete="off">
+        </div>
+        <div class="pc-form-group">
+          <label class="pc-form-label">本地保存路径（可选）</label>
+          <input class="pc-form-input" id="pc-from-github-path"
+            placeholder="留空则自动保存到 gui/projects/仓库名"
+            autocomplete="off">
+        </div>
+      </div>
+      <div class="pc-modal-footer">
+        <button class="pc-btn-cancel" onclick="pcHideModal('pc-open-modal')">取消</button>
+        <button class="pc-btn-primary" id="pc-from-github-btn" onclick="pcDoFromGithub()">
+          <span id="pc-from-github-spinner" style="display:none" class="pc-loading-spinner"></span>
+          ⬇ 下载并导入
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 删除项目 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-delete-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>🗑</span>
+      <span class="pc-modal-title" style="color:var(--cr)">删除项目</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-delete-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div style="font-size:13px;color:var(--tx-s)">确认删除项目：<b id="pc-del-proj-name" style="color:var(--tx-p)"></b></div>
+      <div class="pc-danger-zone">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="pc-del-also-files">
+          <span>同时删除本地目录及所有文件（<b style="color:var(--cr)">不可恢复</b>）</span>
+        </label>
+        <div style="margin-top:6px;font-size:11px;color:var(--tx-m)">
+          不勾选则仅从项目列表移除，本地文件保持不变
+        </div>
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-delete-modal')">取消</button>
+      <button class="pc-btn-danger" onclick="pcDoDelete()">🗑 确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建文件 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-newfile-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>📄</span>
+      <span class="pc-modal-title">新建文件</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-newfile-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div class="pc-form-group">
+        <label class="pc-form-label">文件路径（相对于项目根目录）</label>
+        <input class="pc-form-input" id="pc-newfile-path"
+          placeholder="例如：agents/my-agent.md 或 README.md"
+          autocomplete="off" onkeydown="if(event.key==='Enter')pcDoNewFile()">
+        <span class="pc-form-hint" id="pc-newfile-hint"></span>
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-newfile-modal')">取消</button>
+      <button class="pc-btn-primary" onclick="pcDoNewFile()">📄 创建文件</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建目录 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-newdir-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>📁</span>
+      <span class="pc-modal-title">新建目录</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-newdir-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div class="pc-form-group">
+        <label class="pc-form-label">目录路径（相对于项目根目录）</label>
+        <input class="pc-form-input" id="pc-newdir-path"
+          placeholder="例如：knowledge/chips"
+          autocomplete="off" onkeydown="if(event.key==='Enter')pcDoNewDir()">
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-newdir-modal')">取消</button>
+      <button class="pc-btn-primary" onclick="pcDoNewDir()">📁 创建目录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 重命名 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-rename-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>✏️</span>
+      <span class="pc-modal-title">重命名</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-rename-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div class="pc-form-group">
+        <label class="pc-form-label">新路径（相对于项目根目录）</label>
+        <input class="pc-form-input" id="pc-rename-new" autocomplete="off"
+          onkeydown="if(event.key==='Enter')pcDoRename()">
+        <input type="hidden" id="pc-rename-old">
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-rename-modal')">取消</button>
+      <button class="pc-btn-primary" onclick="pcDoRename()">✏️ 重命名</button>
+    </div>
+  </div>
+</div>
+
+<!-- 删除文件确认 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-delfile-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>🗑</span>
+      <span class="pc-modal-title" style="color:var(--cr)">删除文件</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-delfile-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div style="font-size:13px;color:var(--tx-s)">确认删除：<br>
+        <b id="pc-delfile-name" style="color:var(--tx-p);font-family:monospace"></b>
+      </div>
+      <div style="font-size:11px;color:var(--cr);margin-top:8px">⚠️ 此操作不可撤销</div>
+      <input type="hidden" id="pc-delfile-path">
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-delfile-modal')">取消</button>
+      <button class="pc-btn-danger" onclick="pcDoDeleteFile()">🗑 确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 添加 Agent Modal -->
+<div class="pc-modal-overlay hidden" id="pc-add-agent-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>🤖</span>
+      <span class="pc-modal-title">添加 Agent</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-add-agent-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div class="pc-form-tabs">
+        <button class="pc-form-tab active" id="add-agent-tab-local" onclick="pcSwitchAddTab('agent','local')">📁 本地文件</button>
+        <button class="pc-form-tab" id="add-agent-tab-github" onclick="pcSwitchAddTab('agent','github')">🐙 GitHub URL</button>
+      </div>
+      <div class="pc-form-tab-panel active" id="add-agent-panel-local">
+        <div class="pc-form-group">
+          <label class="pc-form-label">本地 .md 文件路径</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="pc-form-input" id="pc-add-agent-local-path"
+              placeholder="例如：D:/agents/my-agent.md"
+              autocomplete="off" style="flex:1">
+            <button class="pc-tb-btn" onclick="pcBrowse('pc-add-agent-local-path','file','md')" title="浏览 .md 文件" style="padding:6px 10px;flex-shrink:0">📂</button>
+          </div>
+          <span class="pc-form-hint">将复制该 .md 文件到项目的 agents/ 目录</span>
+        </div>
+      </div>
+      <div class="pc-form-tab-panel" id="add-agent-panel-github">
+        <div class="pc-form-group">
+          <label class="pc-form-label">GitHub 文件 URL</label>
+          <input class="pc-form-input" id="pc-add-agent-github-url"
+            placeholder="例如：https://github.com/user/repo/blob/main/agents/my-agent.md"
+            autocomplete="off">
+          <span class="pc-form-hint">支持 GitHub blob URL，文件将下载到项目 agents/ 目录</span>
+        </div>
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-add-agent-modal')">取消</button>
+      <button class="pc-btn-primary" id="pc-add-agent-confirm-btn" onclick="pcDoAddAgent()">
+        <span id="pc-add-agent-spinner" style="display:none" class="pc-loading-spinner"></span>
+        🤖 添加 Agent
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 添加 Skill Modal -->
+<div class="pc-modal-overlay hidden" id="pc-add-skill-modal">
+  <div class="pc-modal-box">
+    <div class="pc-modal-hdr">
+      <span>🛠</span>
+      <span class="pc-modal-title">添加 Skill</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-add-skill-modal')">✕</button>
+    </div>
+    <div class="pc-modal-body">
+      <div class="pc-form-tabs">
+        <button class="pc-form-tab active" id="add-skill-tab-local" onclick="pcSwitchAddTab('skill','local')">📁 本地路径</button>
+        <button class="pc-form-tab" id="add-skill-tab-github" onclick="pcSwitchAddTab('skill','github')">🐙 GitHub URL</button>
+      </div>
+      <div class="pc-form-tab-panel active" id="add-skill-panel-local">
+        <div class="pc-form-group">
+          <label class="pc-form-label">本地 Skill 目录路径</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="pc-form-input" id="pc-add-skill-local-path"
+              placeholder="例如：D:/skills/spi 或 D:/skills/spi/SKILL.md"
+              autocomplete="off" style="flex:1">
+            <button class="pc-tb-btn" onclick="pcBrowse('pc-add-skill-local-path','dir')" title="浏览 Skill 目录" style="padding:6px 10px;flex-shrink:0">📂</button>
+          </div>
+          <span class="pc-form-hint">可以是 Skill 目录或 SKILL.md 文件路径，整个目录将被复制</span>
+        </div>
+      </div>
+      <div class="pc-form-tab-panel" id="add-skill-panel-github">
+        <div class="pc-form-group">
+          <label class="pc-form-label">GitHub 目录 URL</label>
+          <input class="pc-form-input" id="pc-add-skill-github-url"
+            placeholder="例如：https://github.com/user/repo/tree/main/skills/spi"
+            autocomplete="off">
+          <span class="pc-form-hint">支持 GitHub tree URL，目录内容将递归下载到项目 skills/ 目录</span>
+        </div>
+      </div>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcHideModal('pc-add-skill-modal')">取消</button>
+      <button class="pc-btn-primary" id="pc-add-skill-confirm-btn" onclick="pcDoAddSkill()">
+        <span id="pc-add-skill-spinner" style="display:none" class="pc-loading-spinner"></span>
+        🛠 添加 Skill
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 组建项目团队 Modal -->
+<div class="pc-modal-overlay hidden" id="pc-team-modal">
+  <div class="pc-modal-box" style="width:min(600px,96vw)">
+    <div class="pc-modal-hdr">
+      <span>🧑‍🤝‍🧑</span>
+      <span class="pc-modal-title">组建项目团队</span>
+      <button class="pc-modal-close" onclick="pcHideModal('pc-team-modal')">✕</button>
+    </div>
+    <!-- 主 Tab 切换 -->
+    <div style="display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid var(--bd)">
+      <button class="pc-form-tab active" id="pc-team-tab-agent" onclick="pcTeamSwitchTab('agent')" style="flex:1">🤖 Agents</button>
+      <button class="pc-form-tab" id="pc-team-tab-skill" onclick="pcTeamSwitchTab('skill')" style="flex:1">🛠 Skills</button>
+    </div>
+    <!-- Agents Panel -->
+    <div class="pc-form-tab-panel active" id="pc-team-panel-agent">
+      <div class="pc-modal-body" style="gap:10px">
+        <div>
+          <div style="font-size:11px;color:var(--tx-m);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">当前团队 Agents</div>
+          <div id="pc-team-agent-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:6px;background:var(--bg-2)"></div>
+        </div>
+        <div style="border-top:1px solid var(--bd);padding-top:10px">
+          <div class="pc-form-group">
+            <label class="pc-form-label">添加 Agent — 来源</label>
+            <div class="pc-form-tabs" style="margin-bottom:8px">
+              <button class="pc-form-tab active" id="pc-team-agent-tab-pool" onclick="pcTeamSwitchSource('agent','pool')">🗃 资源池</button>
+              <button class="pc-form-tab" id="pc-team-agent-tab-local" onclick="pcTeamSwitchSource('agent','local')">📁 本地文件</button>
+              <button class="pc-form-tab" id="pc-team-agent-tab-github" onclick="pcTeamSwitchSource('agent','github')">🐙 GitHub URL</button>
+            </div>
+            <div id="pc-team-agent-src-pool">
+              <div id="pc-team-agent-pool-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:4px;background:var(--bg-2)">
+                <div style="color:var(--tx-m);font-size:12px;padding:8px;text-align:center">正在加载...</div>
+              </div>
+              <div style="font-size:10px;color:var(--tx-m);margin-top:4px">点击选中条目，再点击"添加 Agent"按钮</div>
+            </div>
+            <div id="pc-team-agent-src-local" style="display:none">
+              <div style="display:flex;gap:6px;align-items:center">
+                <input class="pc-form-input" id="pc-team-agent-local-path" placeholder="选择本地 .md 文件路径" autocomplete="off" style="flex:1">
+                <button class="pc-tb-btn" onclick="pcBrowse('pc-team-agent-local-path','file','md')" title="浏览" style="padding:6px 10px;flex-shrink:0">📂</button>
+              </div>
+            </div>
+            <div id="pc-team-agent-src-github" style="display:none">
+              <input class="pc-form-input" id="pc-team-agent-github-url" placeholder="https://github.com/user/repo/blob/main/agents/xxx.md" autocomplete="off">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pc-modal-footer">
+        <button class="pc-btn-cancel" onclick="pcHideModal('pc-team-modal')">关闭</button>
+        <button class="pc-btn-primary" id="pc-team-agent-add-btn" onclick="pcTeamAdd('agent')">
+          <span id="pc-team-agent-spinner" style="display:none" class="pc-loading-spinner"></span>
+          🤖 添加 Agent
+        </button>
+      </div>
+    </div>
+    <!-- Skills Panel -->
+    <div class="pc-form-tab-panel" id="pc-team-panel-skill">
+      <div class="pc-modal-body" style="gap:10px">
+        <div>
+          <div style="font-size:11px;color:var(--tx-m);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">当前团队 Skills</div>
+          <div id="pc-team-skill-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:6px;background:var(--bg-2)"></div>
+        </div>
+        <div style="border-top:1px solid var(--bd);padding-top:10px">
+          <div class="pc-form-group">
+            <label class="pc-form-label">添加 Skill — 来源</label>
+            <div class="pc-form-tabs" style="margin-bottom:8px">
+              <button class="pc-form-tab active" id="pc-team-skill-tab-pool" onclick="pcTeamSwitchSource('skill','pool')">🗃 资源池</button>
+              <button class="pc-form-tab" id="pc-team-skill-tab-local" onclick="pcTeamSwitchSource('skill','local')">📁 本地目录</button>
+              <button class="pc-form-tab" id="pc-team-skill-tab-github" onclick="pcTeamSwitchSource('skill','github')">🐙 GitHub URL</button>
+            </div>
+            <div id="pc-team-skill-src-pool">
+              <div id="pc-team-skill-pool-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--bd);border-radius:6px;padding:4px;background:var(--bg-2)">
+                <div style="color:var(--tx-m);font-size:12px;padding:8px;text-align:center">正在加载...</div>
+              </div>
+              <div style="font-size:10px;color:var(--tx-m);margin-top:4px">点击选中条目，再点击"添加 Skill"按钮</div>
+            </div>
+            <div id="pc-team-skill-src-local" style="display:none">
+              <div style="display:flex;gap:6px;align-items:center">
+                <input class="pc-form-input" id="pc-team-skill-local-path" placeholder="选择本地 Skill 目录路径" autocomplete="off" style="flex:1">
+                <button class="pc-tb-btn" onclick="pcBrowse('pc-team-skill-local-path','dir')" title="浏览" style="padding:6px 10px;flex-shrink:0">📂</button>
+              </div>
+            </div>
+            <div id="pc-team-skill-src-github" style="display:none">
+              <input class="pc-form-input" id="pc-team-skill-github-url" placeholder="https://github.com/user/repo/tree/main/skills/xxx" autocomplete="off">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pc-modal-footer">
+        <button class="pc-btn-cancel" onclick="pcHideModal('pc-team-modal')">关闭</button>
+        <button class="pc-btn-primary" id="pc-team-skill-add-btn" onclick="pcTeamAdd('skill')">
+          <span id="pc-team-skill-spinner" style="display:none" class="pc-loading-spinner"></span>
+          🛠 添加 Skill
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <!-- Agent Config Modal -->
 <div id="agent-modal" class="modal-overlay" onclick="if(event.target===this)closeAgentModal()">
@@ -1386,7 +2406,37 @@ function renderAgents(agents) {
 }
 
 function renderSkills(skills) {
+  /* 保存数据供 popup 使用 */
+  window._skillsData = skills;
+
   const el = document.getElementById('cards-skills');
+  const sb = document.getElementById('sidebar-skills');
+
+  /* ── 左侧目录栏 ── */
+  if (sb) {
+    const sbItems = skills.map(s => `
+      <div class="skills-sidebar-item" data-skill-id="${s.id}"
+           onmouseenter="showSkillPopup(event,'${s.id}')"
+           onmouseleave="scheduleHideSkillPopup()"
+           onclick="event.stopPropagation();openSkillConfig('${s.id}')">
+        <span>⚙️</span>
+        <span class="sb-name" title="${escHtml(s.name)}">${escHtml(s.name)}</span>
+      </div>`).join('');
+    sb.innerHTML = `
+      <div class="sb-hdr">Skills</div>
+      <div class="sb-search-wrap">
+        <input class="sb-search" id="sb-search-input" type="text"
+          placeholder="🔍 搜索 Skill..." oninput="filterSkillsSidebar(this.value)">
+      </div>
+      <div class="sb-items" id="sb-items">${sbItems}</div>
+      <div class="sb-sep"></div>
+      <div class="skills-sidebar-add" onclick="openCreateSkillModal()">
+        <span>➕</span><span>New Skill</span>
+      </div>`;
+    initSidebarResize();
+  }
+
+  /* ── 紧凑卡片网格 ── */
   const skillCards = skills.map(s => {
     const isActive = activeSkillIds.has(s.id);
     const cat = s.category || '';
@@ -1398,7 +2448,7 @@ function renderSkills(skills) {
       _fullDesc.length > 80 ? `<div class="ccard-extra-item"><span class="ccard-extra-label">详情</span><span>${escHtml(_fullDesc)}</span></div>` : '',
       s.category ? `<div class="ccard-extra-item"><span class="ccard-extra-label">分类</span><span>${escHtml(s.category)}</span></div>` : '',
     ].filter(Boolean).join('');
-    return `<div class="ccard ${isActive?'active-route':''}" id="card-skill-${s.id}">
+    return `<div class="ccard ccard-compact ${isActive?'active-route':''}" id="card-skill-${s.id}">
       ${catLabel ? `<div class="ccard-cat ${catClass}">${catLabel}</div>` : ''}
       <div class="ccard-head">
         <span class="ccard-icon">⚙️</span>
@@ -1421,6 +2471,128 @@ function renderSkills(skills) {
     <div class="ccard-new-sub">点击创建新 Skill</div>
   </div>`;
   el.innerHTML = skillCards + newCard;
+
+  /* 确保 popup DOM 存在 */
+  if (!document.getElementById('skill-hover-popup')) {
+    const pop = document.createElement('div');
+    pop.id = 'skill-hover-popup';
+    pop.onmouseenter = () => { clearTimeout(window._spHideTimer); };
+    pop.onmouseleave = () => { scheduleHideSkillPopup(); };
+    document.body.appendChild(pop);
+  }
+}
+
+/* ── Skill 弹出预览卡 ────────────────────────────────────────── */
+function showSkillPopup(event, skillId) {
+  clearTimeout(window._spHideTimer);
+  const s = (window._skillsData || []).find(x => x.id === skillId);
+  if (!s) return;
+  const popup = document.getElementById('skill-hover-popup');
+  if (!popup) return;
+
+  /* 标亮侧边栏对应项 */
+  document.querySelectorAll('.skills-sidebar-item').forEach(el => {
+    el.classList.toggle('sb-active', el.dataset.skillId === skillId);
+  });
+
+  const cat = s.category || '';
+  const catLabel = cat.replace('-driver','').toUpperCase() || 'SKILL';
+  const desc = s.description ? s.description.replace(/\n/g,' ') : '—';
+  const useCases = s.use_cases || [];
+  const ucHtml = useCases.length
+    ? '<ul style="margin:0 0 0 14px;padding:0;font-size:10px;color:var(--tx-s);line-height:1.7">'
+      + useCases.slice(0,4).map(u => `<li>${escHtml(u)}</li>`).join('')
+      + (useCases.length > 4 ? `<li style="color:var(--tx-m)">… 还有 ${useCases.length-4} 项</li>` : '')
+      + '</ul>'
+    : '';
+  const complexity = s.complexity || s.metadata?.complexity || '';
+  const maturity   = s.maturity   || s.metadata?.maturity   || '';
+
+  popup.innerHTML = `
+    <div class="sp-title">
+      <span>⚙️</span>
+      <span style="flex:1">${escHtml(s.name)}</span>
+      <span class="sp-cat">${escHtml(catLabel)}</span>
+    </div>
+    <div class="sp-desc">${escHtml(desc)}</div>
+    ${ucHtml ? `<div style="font-size:9px;font-weight:700;color:var(--tx-m);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">用途场景</div>${ucHtml}` : ''}
+    <div style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap">
+      ${complexity ? `<div class="sp-row"><b>复杂度</b> ${escHtml(complexity)}</div>` : ''}
+      ${maturity   ? `<div class="sp-row"><b>成熟度</b> ${escHtml(maturity)}</div>` : ''}
+      <div class="sp-row"><b>路径</b> <span style="font-family:monospace;font-size:9px">${escHtml(s.path||'')}</span></div>
+    </div>
+    <div class="sp-actions">
+      <button class="sp-btn" onclick="openSkillConfig('${s.id}')">✏️ 配置</button>
+      <button class="sp-btn sp-btn-del" onclick="openDeleteSkillModal('${s.id}','${escHtml(s.name)}')">🗑️ 删除</button>
+    </div>`;
+
+  popup.classList.add('sp-visible');
+  _positionSkillPopup(event, popup);
+}
+
+function scheduleHideSkillPopup() {
+  window._spHideTimer = setTimeout(() => {
+    const popup = document.getElementById('skill-hover-popup');
+    if (popup) {
+      popup.classList.remove('sp-visible');
+      document.querySelectorAll('.skills-sidebar-item').forEach(el => el.classList.remove('sb-active'));
+    }
+  }, 200);
+}
+
+function _positionSkillPopup(event, popup) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  let lx = event.clientX + 14, ly = event.clientY - 10;
+  popup.style.left = lx + 'px';
+  popup.style.top  = ly + 'px';
+  /* 异步校正溢出 */
+  requestAnimationFrame(() => {
+    const r = popup.getBoundingClientRect();
+    if (r.right  > vw - 8) lx = event.clientX - r.width - 14;
+    if (r.bottom > vh - 8) ly = vh - r.height - 8;
+    popup.style.left = Math.max(4, lx) + 'px';
+    popup.style.top  = Math.max(4, ly) + 'px';
+  });
+}
+
+/* ── 侧边栏搜索过滤 ───────────────────────────────────────────── */
+function filterSkillsSidebar(q) {
+  const items = document.querySelectorAll('#sb-items .skills-sidebar-item');
+  const lq = q.trim().toLowerCase();
+  items.forEach(el => {
+    const name = (el.querySelector('.sb-name')?.textContent || '').toLowerCase();
+    el.style.display = (!lq || name.includes(lq)) ? '' : 'none';
+  });
+}
+
+/* ── 侧边栏拖拽调宽 ───────────────────────────────────────────── */
+function initSidebarResize() {
+  if (window._sbResizeInited) return;
+  const handle  = document.getElementById('sb-resize-handle');
+  const sidebar = document.getElementById('sidebar-skills');
+  if (!handle || !sidebar) return;
+  window._sbResizeInited = true;
+  handle.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    handle.classList.add('dragging');
+    const startX = e.clientX;
+    const startW = sidebar.offsetWidth;
+    function onMove(e2) {
+      const newW = Math.max(100, Math.min(340, startW + e2.clientX - startX));
+      sidebar.style.width = newW + 'px';
+    }
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor     = '';
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor     = 'col-resize';
+  });
 }
 
 function renderRules(rules) {
@@ -1503,6 +2675,11 @@ function toggleCardZoom(cardId) {
   const el = document.getElementById(cardId);
   if (!el) return;
   const expanded = el.classList.toggle('ccard-expanded');
+  if (expanded) {
+    el.classList.remove('ccard-compact');
+  } else if (el.id && el.id.startsWith('card-skill-')) {
+    el.classList.add('ccard-compact');
+  }
   const btn = el.querySelector('.ccard-zoom-btn');
   if (btn) {
     btn.textContent = expanded ? '⤡' : '⤢';
@@ -5782,7 +6959,1442 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }, 8000);
 });
+
+/* ══════════════════════════════════════════════════════════════
+   PROJECT CONFIG PAGE — JavaScript
+══════════════════════════════════════════════════════════════ */
+
+// ── 状态变量 ──────────────────────────────────────────────────
+let currentProjectId = null;
+let currentEditFile  = null;
+let editorDirty      = false;
+let pcProjects       = [];
+let pcAgentsList     = [];
+let pcSkillsList     = [];
+let pcAddAgentMode   = 'local';
+let pcAddSkillMode   = 'local';
+let pcDelProjectId   = null;
+
+// ── 视图切换 ──────────────────────────────────────────────────
+function switchMainView(view) {
+  const isProject = view === 'project';
+  document.getElementById('dashboard').style.display = isProject ? 'none' : '';
+  document.getElementById('routing').style.display   = isProject ? 'none' : '';
+  const pcView = document.getElementById('project-config-view');
+  if (isProject) { pcView.classList.add('visible'); } else { pcView.classList.remove('visible'); }
+  document.getElementById('btn-view-route').classList.toggle('active', !isProject);
+  document.getElementById('btn-view-project').classList.toggle('active', isProject);
+  if (isProject) { pcLoadProjects(); }
+}
+
+// ── Modal 辅助 ─────────────────────────────────────────────────
+function pcShowModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function pcHideModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function pcShowCreateModal() {
+  document.getElementById('pc-create-name').value = '';
+  document.getElementById('pc-create-path').value = '';
+  pcShowModal('pc-create-modal');
+  setTimeout(() => document.getElementById('pc-create-name').focus(), 50);
+}
+function pcShowOpenModal() {
+  document.getElementById('pc-open-path').value = '';
+  document.getElementById('pc-from-github-url').value = '';
+  document.getElementById('pc-from-github-name').value = '';
+  document.getElementById('pc-from-github-path').value = '';
+  pcSwitchOpenTab('local');
+  pcShowModal('pc-open-modal');
+  setTimeout(() => document.getElementById('pc-open-path').focus(), 50);
+}
+function pcSwitchOpenTab(tab) {
+  const isLocal = tab === 'local';
+  document.getElementById('pc-open-tab-local').classList.toggle('active', isLocal);
+  document.getElementById('pc-open-tab-github').classList.toggle('active', !isLocal);
+  document.getElementById('pc-open-panel-local').classList.toggle('active', isLocal);
+  document.getElementById('pc-open-panel-github').classList.toggle('active', !isLocal);
+}
+function pcShowDeleteModal(projectId) {
+  const proj = pcProjects.find(p => p.id === projectId);
+  if (!proj) return;
+  pcDelProjectId = projectId;
+  document.getElementById('pc-del-proj-name').textContent = proj.name;
+  document.getElementById('pc-del-also-files').checked = false;
+  pcShowModal('pc-delete-modal');
+}
+function pcShowAddAgentModal() {
+  if (!currentProjectId) { toast('请先选择一个项目', 'w'); return; }
+  document.getElementById('pc-add-agent-local-path').value = '';
+  document.getElementById('pc-add-agent-github-url').value = '';
+  pcSwitchAddTab('agent', 'local');
+  pcShowModal('pc-add-agent-modal');
+}
+function pcShowAddSkillModal() {
+  if (!currentProjectId) { toast('请先选择一个项目', 'w'); return; }
+  document.getElementById('pc-add-skill-local-path').value = '';
+  document.getElementById('pc-add-skill-github-url').value = '';
+  pcSwitchAddTab('skill', 'local');
+  pcShowModal('pc-add-skill-modal');
+}
+
+// ── Tab 切换（添加 Agent/Skill 弹窗内） ───────────────────────
+function pcSwitchAddTab(type, mode) {
+  const localTab  = document.getElementById('add-' + type + '-tab-local');
+  const githubTab = document.getElementById('add-' + type + '-tab-github');
+  const localPanel  = document.getElementById('add-' + type + '-panel-local');
+  const githubPanel = document.getElementById('add-' + type + '-panel-github');
+  if (mode === 'local') {
+    localTab.classList.add('active'); githubTab.classList.remove('active');
+    localPanel.classList.add('active'); githubPanel.classList.remove('active');
+    if (type === 'agent') pcAddAgentMode = 'local'; else pcAddSkillMode = 'local';
+  } else {
+    githubTab.classList.add('active'); localTab.classList.remove('active');
+    githubPanel.classList.add('active'); localPanel.classList.remove('active');
+    if (type === 'agent') pcAddAgentMode = 'github'; else pcAddSkillMode = 'github';
+  }
+}
+
+// ── 侧边栏折叠 ────────────────────────────────────────────────
+function pcToggleSection(bodyId) {
+  const body = document.getElementById(bodyId);
+  if (!body) return;
+  const hdr = body.previousElementSibling;
+  const section = body.parentElement;
+  const isCollapsed = body.classList.toggle('collapsed');
+  if (hdr) hdr.classList.toggle('collapsed', isCollapsed);
+  if (section) section.classList.toggle('collapsed', isCollapsed);
+}
+
+// ── 侧边栏拖拽调宽 ───────────────────────────────────────────
+(function() {
+  let dragging = false, startX = 0, startW = 0;
+  document.addEventListener('mousedown', function(e) {
+    if (e.target && e.target.id === 'pc-sb-resize-handle') {
+      dragging = true; startX = e.clientX;
+      startW = document.getElementById('pc-sidebar').offsetWidth;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const newW = Math.max(180, Math.min(500, startW + (e.clientX - startX)));
+    document.getElementById('pc-sidebar').style.width = newW + 'px';
+  });
+  document.addEventListener('mouseup', function() {
+    if (dragging) { dragging = false; document.body.style.cursor = ''; document.body.style.userSelect = ''; }
+  });
+})();
+
+// ── 加载项目列表 ──────────────────────────────────────────────
+async function pcLoadProjects() {
+  try {
+    const res = await fetch('/api/projects');
+    const data = await res.json();
+    pcProjects = data.projects || [];
+    pcRenderProjectList();
+  } catch(e) { toast('加载项目列表失败: ' + e.message, 'd'); }
+}
+
+function pcRenderProjectList() {
+  const list = document.getElementById('pc-proj-list');
+  document.getElementById('pc-proj-count').textContent = pcProjects.length;
+  if (!pcProjects.length) {
+    list.innerHTML = '<div style="padding:10px 12px;font-size:11px;color:var(--tx-m)">暂无项目，点击下方按钮新建</div>';
+    return;
+  }
+  list.innerHTML = pcProjects.map(function(p) {
+    const active = p.id === currentProjectId ? ' active' : '';
+    return '<div class="pc-proj-item' + active + '" onclick="pcSelectProject(\'' + p.id + '\')" title="' + escHtml(p.path) + '">'
+      + '<span style="font-size:13px">📦</span>'
+      + '<span class="proj-name">' + escHtml(p.name) + '</span>'
+      + '<span class="proj-del" onclick="event.stopPropagation();pcShowDeleteModal(\'' + p.id + '\')" title="删除项目">✕</span>'
+      + '</div>';
+  }).join('');
+}
+
+// ── 选中项目 ─────────────────────────────────────────────────
+async function pcSelectProject(projectId) {
+  if (editorDirty && currentProjectId) {
+    if (!confirm('当前文件有未保存的修改，切换项目将丢弃更改，继续？')) return;
+  }
+  currentProjectId = projectId;
+  currentEditFile = null;
+  editorDirty = false;
+  pcRenderProjectList();
+  ['pc-btn-newfile','pc-btn-newdir','pc-btn-add-agent','pc-btn-add-skill']
+    .forEach(function(id) { document.getElementById(id).disabled = false; });
+  pcShowOverview();
+  await Promise.all([pcLoadFileTree(), pcLoadAgents(), pcLoadSkills()]);
+  // 首次选择项目时自动后台扫描 CLI（结果驻留列表）
+  if (!pcCLIScanDone) { setTimeout(function(){ pcScanCLI(); }, 600); }
+  const proj = pcProjects.find(function(p) { return p.id === projectId; });
+  document.getElementById('pc-current-path').textContent = proj ? proj.path : '';
+}
+
+// ── 项目概览 ──────────────────────────────────────────────────
+function pcShowOverview() {
+  document.getElementById('pc-editor-wrap').style.display = 'none';
+  const overview = document.getElementById('pc-overview');
+  overview.style.display = 'flex';
+  const noProj = document.getElementById('pc-no-project-state');
+  const projOv = document.getElementById('pc-project-overview');
+  if (!currentProjectId) { noProj.style.display = 'flex'; projOv.style.display = 'none'; return; }
+  noProj.style.display = 'none';
+  projOv.style.display = 'block';
+  const proj = pcProjects.find(function(p) { return p.id === currentProjectId; });
+  if (!proj) return;
+  document.getElementById('pc-overview-name').innerHTML = '📦 ' + escHtml(proj.name);
+  document.getElementById('pc-overview-meta').textContent = '路径: ' + proj.path;
+}
+
+function pcUpdateStatGrid() {
+  const grid = document.getElementById('pc-stat-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="pc-stat-card agents"><div class="pc-stat-label">Agents</div><div class="pc-stat-value">' + pcAgentsList.length + '</div></div>'
+    + '<div class="pc-stat-card skills"><div class="pc-stat-label">Skills</div><div class="pc-stat-value">' + pcGetMergedSkillList().length + '</div></div>';
+}
+
+// ── 文件树 ────────────────────────────────────────────────────
+async function pcLoadFileTree() {
+  if (!currentProjectId) return;
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/tree');
+    const data = await res.json();
+    pcRenderFileTree(data.tree || []);
+  } catch(e) { console.error('文件树加载失败', e); }
+}
+
+function pcRenderFileTree(nodes, container, depth) {
+  depth = depth || 0;
+  const wrap = container || document.getElementById('pc-file-tree');
+  if (!container) wrap.innerHTML = '';
+  if (!nodes || !nodes.length) {
+    if (!container) wrap.innerHTML = '<div style="padding:10px 12px;font-size:11px;color:var(--tx-m)">目录为空</div>';
+    return;
+  }
+  nodes.forEach(function(node) {
+    const indent = depth * 14;
+    const isDir = node.type === 'dir';
+    const icon = isDir ? '📁' : pcGetFileIcon(node.name);
+    const el = document.createElement('div');
+    el.className = 'pc-tree-node' + (node.path === currentEditFile ? ' selected' : '');
+    const renameBtn = !isDir ? '<span class="tree-action-btn" title="重命名" onclick="event.stopPropagation();pcShowRenameModal(\'' + escHtml(node.path) + '\')">✏</span>' : '';
+    el.innerHTML = '<span class="tree-indent" style="width:' + indent + 'px"></span>'
+      + '<span class="tree-icon">' + icon + '</span>'
+      + '<span class="tree-name" title="' + escHtml(node.path) + '">' + escHtml(node.name) + '</span>'
+      + '<span class="tree-actions">' + renameBtn
+      + '<span class="tree-action-btn" title="删除" onclick="event.stopPropagation();pcConfirmDeleteFile(\'' + escHtml(node.path) + '\')">🗑</span>'
+      + '</span>';
+    if (!isDir) {
+      el.onclick = (function(p) { return function() { pcOpenFile(p); }; })(node.path);
+      wrap.appendChild(el);
+    } else {
+      const childWrap = document.createElement('div');
+      let expanded = true;
+      el.onclick = (function(cw, e) {
+        return function() {
+          expanded = !expanded;
+          cw.style.display = expanded ? '' : 'none';
+          e.querySelector('.tree-icon').textContent = expanded ? '📂' : '📁';
+        };
+      })(childWrap, el);
+      wrap.appendChild(el);
+      if (node.children && node.children.length) {
+        pcRenderFileTree(node.children, childWrap, depth + 1);
+      }
+      wrap.appendChild(childWrap);
+    }
+  });
+}
+
+function pcGetFileIcon(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const map = {md:'📝', json:'📋', yaml:'📋', yml:'📋', js:'📜', py:'🐍', txt:'📄', html:'🌐', css:'🎨', c:'⚙', h:'⚙'};
+  return map[ext] || '📄';
+}
+
+// ── 文件编辑器 ────────────────────────────────────────────────
+async function pcOpenFile(filePath) {
+  if (editorDirty) {
+    if (!confirm('当前文件有未保存修改，继续打开新文件将丢弃更改？')) return;
+  }
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/file?path=' + encodeURIComponent(filePath));
+    const data = await res.json();
+    if (data.error) { toast('读取文件失败: ' + data.error, 'd'); return; }
+    currentEditFile = filePath;
+    editorDirty = false;
+    document.getElementById('pc-editor').value = data.content;
+    document.getElementById('pc-editor-wrap').style.display = 'flex';
+    document.getElementById('pc-overview').style.display = 'none';
+    document.getElementById('pc-current-path').textContent = filePath;
+    document.getElementById('pc-save-status').textContent = '';
+    // -- 只读模式：agents/ 或 skills/ 下的文件不允许在项目配置中编辑 --
+    const isReadOnly = /^(agents[/]|skills[/])/.test(filePath);
+    const editorEl = document.getElementById('pc-editor');
+    editorEl.readOnly = isReadOnly;
+    editorEl.style.opacity = isReadOnly ? '0.72' : '1';
+    const saveBtn = document.getElementById('pc-editor-save-btn');
+    if (saveBtn) saveBtn.style.display = isReadOnly ? 'none' : '';
+    const roHint = document.getElementById('pc-editor-readonly-hint');
+    if (roHint) roHint.style.display = isReadOnly ? 'inline-flex' : 'none';
+    pcLoadFileTree();
+  } catch(e) { toast('读取文件失败: ' + e.message, 'd'); }
+}
+
+function pcMarkEditorDirty() {
+  if (!editorDirty) {
+    editorDirty = true;
+    document.getElementById('pc-save-status').textContent = '● 未保存';
+  }
+}
+
+async function pcSaveFile() {
+  if (!currentProjectId || !currentEditFile) return;
+  const content = document.getElementById('pc-editor').value;
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/file', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: currentEditFile, content: content })
+    });
+    const data = await res.json();
+    if (data.error) { toast('保存失败: ' + data.error, 'd'); return; }
+    editorDirty = false;
+    document.getElementById('pc-save-status').textContent = '✓ 已保存';
+    setTimeout(function() { document.getElementById('pc-save-status').textContent = ''; }, 2000);
+    toast('文件已保存', 's');
+  } catch(e) { toast('保存失败: ' + e.message, 'd'); }
+}
+
+function pcCloseFile() {
+  if (editorDirty && !confirm('有未保存修改，确认关闭？')) return;
+  currentEditFile = null; editorDirty = false;
+  // -- 重置只读状态 --
+  var editorEl = document.getElementById('pc-editor');
+  editorEl.readOnly = false;
+  editorEl.style.opacity = '1';
+  var saveBtn = document.getElementById('pc-editor-save-btn');
+  if (saveBtn) saveBtn.style.display = '';
+  var roHint = document.getElementById('pc-editor-readonly-hint');
+  if (roHint) roHint.style.display = 'none';
+  document.getElementById('pc-editor-wrap').style.display = 'none';
+  document.getElementById('pc-overview').style.display = 'flex';
+  const proj = pcProjects.find(function(p) { return p.id === currentProjectId; });
+  document.getElementById('pc-current-path').textContent = proj ? proj.path : '';
+  pcLoadFileTree();
+}
+
+// ── 新建文件 ──────────────────────────────────────────────────
+function pcNewFile() {
+  if (!currentProjectId) return;
+  document.getElementById('pc-newfile-path').value = '';
+  document.getElementById('pc-newfile-hint').textContent = '';
+  pcShowModal('pc-newfile-modal');
+  setTimeout(function() { document.getElementById('pc-newfile-path').focus(); }, 50);
+}
+async function pcDoNewFile() {
+  const path = document.getElementById('pc-newfile-path').value.trim();
+  if (!path) { document.getElementById('pc-newfile-hint').textContent = '请输入文件路径'; return; }
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/file', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: path, content: '' })
+    });
+    const data = await res.json();
+    if (data.error) { toast('创建失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-newfile-modal');
+    toast('文件已创建: ' + path, 's');
+    await pcLoadFileTree();
+    pcOpenFile(path);
+  } catch(e) { toast('创建失败: ' + e.message, 'd'); }
+}
+
+// ── 新建目录 ──────────────────────────────────────────────────
+function pcNewDir() {
+  if (!currentProjectId) return;
+  document.getElementById('pc-newdir-path').value = '';
+  pcShowModal('pc-newdir-modal');
+  setTimeout(function() { document.getElementById('pc-newdir-path').focus(); }, 50);
+}
+async function pcDoNewDir() {
+  const path = document.getElementById('pc-newdir-path').value.trim();
+  if (!path) return;
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/mkdir', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: path })
+    });
+    const data = await res.json();
+    if (data.error) { toast('创建目录失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-newdir-modal');
+    toast('目录已创建: ' + path, 's');
+    pcLoadFileTree();
+  } catch(e) { toast('创建目录失败: ' + e.message, 'd'); }
+}
+
+// ── 重命名 ────────────────────────────────────────────────────
+function pcShowRenameModal(oldPath) {
+  document.getElementById('pc-rename-old').value = oldPath;
+  document.getElementById('pc-rename-new').value = oldPath;
+  pcShowModal('pc-rename-modal');
+  setTimeout(function() { const inp = document.getElementById('pc-rename-new'); inp.focus(); inp.select(); }, 50);
+}
+async function pcDoRename() {
+  const oldPath = document.getElementById('pc-rename-old').value;
+  const newPath = document.getElementById('pc-rename-new').value.trim();
+  if (!newPath || newPath === oldPath) { pcHideModal('pc-rename-modal'); return; }
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/rename', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ old_path: oldPath, new_path: newPath })
+    });
+    const data = await res.json();
+    if (data.error) { toast('重命名失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-rename-modal');
+    if (currentEditFile === oldPath) { currentEditFile = newPath; }
+    toast('重命名成功', 's');
+    pcLoadFileTree();
+  } catch(e) { toast('重命名失败: ' + e.message, 'd'); }
+}
+
+// ── 删除文件 ──────────────────────────────────────────────────
+function pcConfirmDeleteFile(filePath) {
+  document.getElementById('pc-delfile-name').textContent = filePath;
+  document.getElementById('pc-delfile-path').value = filePath;
+  pcShowModal('pc-delfile-modal');
+}
+async function pcDoDeleteFile() {
+  const path = document.getElementById('pc-delfile-path').value;
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/file?path=' + encodeURIComponent(path), { method: 'DELETE' });
+    const data = await res.json();
+    if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-delfile-modal');
+    if (currentEditFile === path) pcCloseFile();
+    toast('已删除: ' + path, 's');
+    pcLoadFileTree();
+    if (path.startsWith('agents/')) pcLoadAgents();
+    if (path.startsWith('skills/')) pcLoadSkills();
+  } catch(e) { toast('删除失败: ' + e.message, 'd'); }
+}
+
+// ── 项目 CRUD ─────────────────────────────────────────────────
+async function pcDoCreate() {
+  const name   = document.getElementById('pc-create-name').value.trim();
+  const parent = document.getElementById('pc-create-path').value.trim();
+  if (!name || !parent) { toast('请填写项目名称和父目录', 'w'); return; }
+  const path = parent.replace(/[\/]+$/, '') + '/' + name;
+  try {
+    const res = await fetch('/api/projects/create', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name: name, path: path })
+    });
+    const data = await res.json();
+    if (data.error) { toast('创建失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-create-modal');
+    toast('项目 "' + name + '" 已创建', 's');
+    await pcLoadProjects();
+    pcSelectProject(data.project.id);
+  } catch(e) { toast('创建失败: ' + e.message, 'd'); }
+}
+
+async function pcDoOpen() {
+  const path = document.getElementById('pc-open-path').value.trim();
+  if (!path) { toast('请输入目录路径', 'w'); return; }
+  try {
+    const res = await fetch('/api/projects/open', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ path: path })
+    });
+    const data = await res.json();
+    if (data.error) { toast('导入失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-open-modal');
+    toast('项目 "' + data.project.name + '" 已导入', 's');
+    await pcLoadProjects();
+    pcSelectProject(data.project.id);
+  } catch(e) { toast('导入失败: ' + e.message, 'd'); }
+}
+
+async function pcDoFromGithub() {
+  const url  = document.getElementById('pc-from-github-url').value.trim();
+  const name = document.getElementById('pc-from-github-name').value.trim();
+  const path = document.getElementById('pc-from-github-path').value.trim();
+  if (!url) { toast('请输入 GitHub 仓库 URL', 'w'); return; }
+  if (!/^https?:\/\/github\.com\//.test(url)) {
+    toast('URL 格式不正确，应以 https://github.com/ 开头', 'w'); return;
+  }
+  const btn = document.getElementById('pc-from-github-btn');
+  const spinner = document.getElementById('pc-from-github-spinner');
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  btn.childNodes[btn.childNodes.length - 1].textContent = ' 下载中…';
+  try {
+    const body = { url: url };
+    if (name) body.name = name;
+    if (path) body.local_path = path;
+    const res = await fetch('/api/projects/from_github', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { toast('下载失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-open-modal');
+    toast('已下载 ' + data.downloaded + ' 个文件，项目 "' + data.project.name + '" 已创建', 's');
+    await pcLoadProjects();
+    pcSelectProject(data.project.id);
+  } catch(e) { toast('下载失败: ' + e.message, 'd'); }
+  finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+    btn.childNodes[btn.childNodes.length - 1].textContent = ' 下载并导入';
+  }
+}
+
+async function pcDoDelete() {
+  if (!pcDelProjectId) return;
+  const deleteFiles = document.getElementById('pc-del-also-files').checked;
+  try {
+    const res = await fetch('/api/projects/' + pcDelProjectId, {
+      method: 'DELETE', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ delete_files: deleteFiles })
+    });
+    const data = await res.json();
+    if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-delete-modal');
+    if (currentProjectId === pcDelProjectId) {
+      currentProjectId = null; currentEditFile = null; editorDirty = false;
+      ['pc-btn-newfile','pc-btn-newdir','pc-btn-add-agent','pc-btn-add-skill']
+        .forEach(function(id) { document.getElementById(id).disabled = true; });
+      document.getElementById('pc-current-path').textContent = '未选择项目';
+      document.getElementById('pc-file-tree').innerHTML = '<div style="padding:12px;font-size:11px;color:var(--tx-m)">请先选择一个项目</div>';
+      document.getElementById('pc-agents-list').innerHTML = '';
+      document.getElementById('pc-skills-list').innerHTML = '';
+      pcAgentsList = []; pcSkillsList = [];
+      pcUpdateStatGrid();
+      pcShowOverview();
+    }
+    toast('项目已删除', 's');
+    await pcLoadProjects();
+  } catch(e) { toast('删除失败: ' + e.message, 'd'); }
+}
+
+// ── Agents 管理 ────────────────────────────────────────────────
+async function pcLoadAgents() {
+  if (!currentProjectId) return;
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/agents');
+    const data = await res.json();
+    pcAgentsList = data.agents || [];
+    pcRenderAgentList(pcAgentsList);
+    document.getElementById('pc-agents-count').textContent = pcAgentsList.length;
+    pcUpdateStatGrid();
+    pcRefreshSkillsDisplay(); // agent 变化后刷新 skills 关联展示
+  } catch(e) { console.error('加载 agents 失败', e); }
+}
+
+function pcRenderAgentList(agents) {
+  const list = document.getElementById('pc-agents-list');
+  if (!agents.length) {
+    list.innerHTML = '<div style="padding:10px 12px;font-size:11px;color:var(--tx-m)">暂无 Agent，点击工具栏添加</div>';
+    return;
+  }
+  list.innerHTML = agents.map(function(a) {
+    return '<div class="pc-list-item agent-item"'
+      + ' data-name="' + escHtml(a.name) + '" data-path="' + escHtml(a.path) + '"'
+      + ' onclick="pcAgentItemClick(event,this)"'
+      + ' ondblclick="pcAgentItemDblClick(event,this)">'
+      + '<span class="item-icon">🤖</span>'
+      + '<span class="item-name" title="' + escHtml(a.name) + ' (单击预览 / 双击浏览)">' + escHtml(a.name) + '</span>'
+      + '<span class="item-del" onclick="event.stopPropagation();pcDeleteAgent(\'' + escHtml(a.name) + '\')" title="删除 Agent">✕</span>'
+      + '</div>';
+  }).join('');
+}
+
+function pcFilterList(type) {
+  const q = document.getElementById('pc-' + type + '-search').value.toLowerCase();
+  if (type === 'agent') pcRenderAgentList(pcAgentsList.filter(function(a) { return a.name.toLowerCase().indexOf(q) >= 0; }));
+  else { var _ml = pcGetMergedSkillList(); pcRenderSkillList(_ml.filter(function(s) { return s.name.toLowerCase().indexOf(q) >= 0; })); }
+}
+
+async function pcDoAddAgent() {
+  const btn = document.getElementById('pc-add-agent-confirm-btn');
+  const spinner = document.getElementById('pc-add-agent-spinner');
+  let body;
+  if (pcAddAgentMode === 'local') {
+    const path = document.getElementById('pc-add-agent-local-path').value.trim();
+    if (!path) { toast('请输入本地文件路径', 'w'); return; }
+    body = { source: 'local', path: path };
+  } else {
+    const url = document.getElementById('pc-add-agent-github-url').value.trim();
+    if (!url) { toast('请输入 GitHub URL', 'w'); return; }
+    body = { source: 'github', url: url };
+  }
+  btn.disabled = true; spinner.style.display = 'inline-block';
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/add_agent', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { toast('添加失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-add-agent-modal');
+    toast('Agent "' + data.agent.name + '" 已添加', 's');
+    pcLoadAgents(); pcLoadFileTree();
+  } catch(e) { toast('添加失败: ' + e.message, 'd'); }
+  finally { btn.disabled = false; spinner.style.display = 'none'; }
+}
+
+async function pcDeleteAgent(agentName) {
+  pcConfirmDialog('确认从项目中删除 Agent: ' + agentName + '？', async function() {
+    try {
+      const res = await fetch('/api/projects/' + currentProjectId + '/agents/' + encodeURIComponent(agentName), { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
+      toast('Agent "' + agentName + '" 已删除', 's');
+      pcLoadAgents(); pcLoadFileTree();
+    } catch(e) { toast('删除失败: ' + e.message, 'd'); }
+  });
+}
+
+// ── Skills 管理 ────────────────────────────────────────────────
+async function pcLoadSkills() {
+  if (!currentProjectId) return;
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/skills');
+    const data = await res.json();
+    pcSkillsList = data.skills || [];
+    pcRefreshSkillsDisplay();
+    pcUpdateStatGrid();
+  } catch(e) { console.error('加载 skills 失败', e); }
+}
+
+// ── 获取合并技能列表（手动 + agent 关联）─────────────────────────────────
+function pcGetMergedSkillList() {
+  var manualSkills = pcSkillsList.map(function(s) {
+    return { name: s.name, path: s.path, source: 'manual' };
+  });
+  var manualNames = new Set(pcSkillsList.map(function(s) { return s.name; }));
+  var agentSkills = [];
+  if (projectData && projectData.agents) {
+    pcAgentsList.forEach(function(projAgent) {
+      var fname = projAgent.path ? projAgent.path.split('/').pop() : '';
+      var fullAgent = projectData.agents.find(function(a) {
+        return a.name === projAgent.name || (a.path && a.path.split('/').pop() === fname);
+      });
+      if (!fullAgent) return;
+      (fullAgent.skills || []).forEach(function(skill) {
+        var skillName = typeof skill === 'string' ? skill : (skill.name || String(skill));
+        if (manualNames.has(skillName)) return;
+        if (agentSkills.some(function(x) { return x.name === skillName; })) return;
+        var skillData = (projectData.skills || []).find(function(s) { return s.name === skillName; });
+        agentSkills.push({
+          name: skillName,
+          path: skillData ? skillData.path : ('skills/' + skillName),
+          source: 'agent',
+          fromAgent: projAgent.name
+        });
+      });
+    });
+  }
+  return manualSkills.concat(agentSkills);
+}
+
+function pcRefreshSkillsDisplay() {
+  var merged = pcGetMergedSkillList();
+  document.getElementById('pc-skills-count').textContent = merged.length;
+  pcRenderSkillList(merged);
+}
+
+function pcRenderSkillList(skills) {
+  const list = document.getElementById('pc-skills-list');
+  if (!skills.length) {
+    list.innerHTML = '<div style="padding:10px 12px;font-size:11px;color:var(--tx-m)">暂无 Skill，点击工具栏添加</div>';
+    return;
+  }
+  list.innerHTML = skills.map(function(s) {
+    var isManual = !s.source || s.source === 'manual';
+    var agentTag = s.fromAgent
+      ? '<span style="font-size:9px;color:var(--ca);background:#1f335820;border:1px solid #388bfd30;border-radius:3px;padding:1px 4px;margin-left:2px;flex-shrink:0;white-space:nowrap">' + escHtml(s.fromAgent) + '</span>'
+      : '';
+    return '<div class="pc-list-item skill-item"'
+      + ' data-name="' + escHtml(s.name) + '" data-path="' + escHtml(s.path) + '"'
+      + ' onclick="pcSkillItemClick(event,this)"'
+      + ' ondblclick="pcSkillItemDblClick(event,this)">'
+      + '<span class="item-icon">⚙️</span>'
+      + '<span class="item-name" title="' + escHtml(s.name) + (s.fromAgent ? ' (来自 ' + escHtml(s.fromAgent) + ')' : '') + '">' + escHtml(s.name) + '</span>'
+      + agentTag
+      + (isManual ? '<span class="item-del" onclick="event.stopPropagation();pcDeleteSkill(\'' + escHtml(s.name) + '\')" title="删除 Skill">✕</span>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function pcOpenSkillDir(skillName, skillPath) {
+  pcOpenFile(skillPath + '/SKILL.md');
+}
+
+async function pcDoAddSkill() {
+  const btn = document.getElementById('pc-add-skill-confirm-btn');
+  const spinner = document.getElementById('pc-add-skill-spinner');
+  let body;
+  if (pcAddSkillMode === 'local') {
+    const path = document.getElementById('pc-add-skill-local-path').value.trim();
+    if (!path) { toast('请输入本地路径', 'w'); return; }
+    body = { source: 'local', path: path };
+  } else {
+    const url = document.getElementById('pc-add-skill-github-url').value.trim();
+    if (!url) { toast('请输入 GitHub URL', 'w'); return; }
+    body = { source: 'github', url: url };
+  }
+  btn.disabled = true; spinner.style.display = 'inline-block';
+  try {
+    const res = await fetch('/api/projects/' + currentProjectId + '/add_skill', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { toast('添加失败: ' + data.error, 'd'); return; }
+    pcHideModal('pc-add-skill-modal');
+    toast('Skill "' + data.skill.name + '" 已添加', 's');
+    pcLoadSkills(); pcLoadFileTree();
+  } catch(e) { toast('添加失败: ' + e.message, 'd'); }
+  finally { btn.disabled = false; spinner.style.display = 'none'; }
+}
+
+async function pcDeleteSkill(skillName) {
+  pcConfirmDialog('确认从项目中删除 Skill: ' + skillName + '？\n（将删除 skills/' + skillName + '/ 整个目录）', async function() {
+    try {
+      const res = await fetch('/api/projects/' + currentProjectId + '/skills/' + encodeURIComponent(skillName), { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
+      toast('Skill "' + skillName + '" 已删除', 's');
+      pcLoadSkills(); pcLoadFileTree();
+    } catch(e) { toast('删除失败: ' + e.message, 'd'); }
+  });
+}
+
+// ── 键盘快捷键 ────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    const pcView = document.getElementById('project-config-view');
+    if (pcView && pcView.classList.contains('visible') && currentEditFile) {
+      e.preventDefault();
+      pcSaveFile();
+    }
+  }
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.pc-modal-overlay:not(.hidden)').forEach(function(m) { m.classList.add('hidden'); });
+  }
+});
+
+// ── 辅助：HTML 转义 ───────────────────────────────────────────
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+
+// ══════════════════════════════════════════════════════════════════════
+// 文件/文件夹 本地浏览 (native OS dialog via /api/browse)
+// ══════════════════════════════════════════════════════════════════════
+async function pcBrowse(inputId, type, filter) {
+  try {
+    let url = '/api/browse?type=' + encodeURIComponent(type);
+    if (filter) url += '&filter=' + encodeURIComponent(filter);
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.path) {
+      document.getElementById(inputId).value = data.path;
+    } else if (data.error) {
+      toast('浏览失败: ' + data.error, 'd');
+    }
+  } catch(e) { toast('浏览失败: ' + e.message, 'd'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 组建项目团队弹窗
+// ══════════════════════════════════════════════════════════════════════
+function pcShowTeamModal() {
+  if (!currentProjectId) { toast('请先选择一个项目', 'w'); return; }
+  if (pcSelectedCLI && pcSelectedCLI.folder) pcSetupTeamDir(true);
+  pcTeamSwitchTab('agent');
+  pcTeamSwitchSource('agent', 'pool');
+  pcTeamSwitchSource('skill', 'pool');
+  pcTeamRefreshPool('agent');
+  pcTeamRefreshPool('skill');
+  pcTeamRefresh('agent');
+  pcTeamRefresh('skill');
+  pcShowModal('pc-team-modal');
+}
+
+function pcTeamSwitchTab(tab) {
+  const isAgent = tab === 'agent';
+  document.getElementById('pc-team-tab-agent').classList.toggle('active', isAgent);
+  document.getElementById('pc-team-tab-skill').classList.toggle('active', !isAgent);
+  document.getElementById('pc-team-panel-agent').classList.toggle('active', isAgent);
+  document.getElementById('pc-team-panel-skill').classList.toggle('active', !isAgent);
+}
+
+function pcTeamSwitchSource(type, src) {
+  const isPool   = src === 'pool';
+  const isLocal  = src === 'local';
+  const isGithub = src === 'github';
+  var poolTab   = document.getElementById('pc-team-' + type + '-tab-pool');
+  var localTab  = document.getElementById('pc-team-' + type + '-tab-local');
+  var githubTab = document.getElementById('pc-team-' + type + '-tab-github');
+  var poolSrc   = document.getElementById('pc-team-' + type + '-src-pool');
+  var localSrc  = document.getElementById('pc-team-' + type + '-src-local');
+  var githubSrc = document.getElementById('pc-team-' + type + '-src-github');
+  if (poolTab)   poolTab.classList.toggle('active', isPool);
+  if (localTab)  localTab.classList.toggle('active', isLocal);
+  if (githubTab) githubTab.classList.toggle('active', isGithub);
+  if (poolSrc)   poolSrc.style.display   = isPool   ? '' : 'none';
+  if (localSrc)  localSrc.style.display  = isLocal  ? '' : 'none';
+  if (githubSrc) githubSrc.style.display = isGithub ? '' : 'none';
+}
+
+function pcTeamRefresh(type) {
+  const listEl = document.getElementById('pc-team-' + type + '-list');
+  if (!listEl) return;
+  const items  = (type === 'agent') ? (pcAgentsList || []) : (pcSkillsList || []);
+  if (items.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--tx-m);font-size:12px;padding:8px;text-align:center">暂无 '
+      + (type === 'agent' ? 'Agent' : 'Skill') + '</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function(item) {
+    const name = (typeof item === 'object') ? (item.name || item.id || JSON.stringify(item)) : String(item);
+    const icon = type === 'agent' ? '🤖' : '🛠';
+    const safeType = JSON.stringify(type);
+    const safeName = JSON.stringify(name);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;'
+      + 'border-radius:4px;margin-bottom:2px;background:var(--bg)">'
+      + '<span style="font-size:12px;font-family:monospace">' + icon + ' ' + escHtml(name) + '</span>'
+      + '<button onclick="pcTeamDelete(' + safeType + ',' + safeName + ')" '
+      + 'style="border:none;background:transparent;color:var(--cr);cursor:pointer;font-size:12px;padding:2px 6px" '
+      + 'title="移除">🗑</button>'
+      + '</div>';
+  }).join('');
+}
+
+async function pcTeamAdd(type) {
+  const isAgent     = type === 'agent';
+  const localPathId = 'pc-team-' + type + '-local-path';
+  const githubUrlId = 'pc-team-' + type + '-github-url';
+  const poolTabEl   = document.getElementById('pc-team-' + type + '-tab-pool');
+  const localTabEl  = document.getElementById('pc-team-' + type + '-tab-local');
+  const isPool      = poolTabEl  && poolTabEl.classList.contains('active');
+  const isLocal     = !isPool && localTabEl && localTabEl.classList.contains('active');
+  const spinnerId   = 'pc-team-' + type + '-spinner';
+  const btnId       = 'pc-team-' + type + '-add-btn';
+  let body = {};
+  if (isPool) {
+    const selectedEl = document.querySelector('#pc-team-' + type + '-pool-list .pc-pool-item.selected');
+    if (!selectedEl) { toast('请先从资源池中点击选中一项', 'w'); return; }
+    body = { source: 'pool', path: selectedEl.dataset.path };
+  } else if (isLocal) {
+    const path = document.getElementById(localPathId).value.trim();
+    if (!path) { toast('请输入或浏览选择路径', 'w'); return; }
+    body = { source: 'local', path: path };
+  } else {
+    const url = document.getElementById(githubUrlId).value.trim();
+    if (!url) { toast('请输入 GitHub URL', 'w'); return; }
+    body = { source: 'github', url: url };
+  }
+  document.getElementById(btnId).disabled = true;
+  document.getElementById(spinnerId).style.display = 'inline-block';
+  try {
+    const endpoint = isAgent
+      ? ('/api/projects/' + currentProjectId + '/add_agent')
+      : ('/api/projects/' + currentProjectId + '/add_skill');
+    const res  = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.error) { toast('添加失败: ' + data.error, 'd'); return; }
+    toast((isAgent ? 'Agent' : 'Skill') + ' 已添加', 's');
+    if (isAgent && pcSelectedCLI && data.agent && data.agent.name) {
+      setTimeout(function(){ pcShowCopyFilesModal(data.agent.name); }, 400);
+    }
+    if (isLocal) document.getElementById(localPathId).value = '';
+    var selEl = document.querySelector('#pc-team-' + type + '-pool-list .pc-pool-item.selected');
+    if (selEl) selEl.classList.remove('selected');
+    if (isAgent) { await pcLoadAgents(); pcTeamRefresh('agent'); pcTeamRefreshPool('agent'); }
+    else         { await pcLoadSkills(); pcTeamRefresh('skill'); pcTeamRefreshPool('skill'); }
+    pcLoadFileTree();
+  } catch(e) { toast('添加失败: ' + e.message, 'd'); }
+  finally {
+    document.getElementById(btnId).disabled = false;
+    document.getElementById(spinnerId).style.display = 'none';
+  }
+}
+
+
+function pcTeamRefreshPool(type) {
+  var poolListEl = document.getElementById('pc-team-' + type + '-pool-list');
+  if (!poolListEl) return;
+  // 使用全局 projectData（由 WebSocket project_update 事件填充）
+  var items = (type === 'agent')
+    ? ((projectData && projectData.agents) || [])
+    : ((projectData && projectData.skills) || []);
+  var existingNames = ((type === 'agent') ? (pcAgentsList || []) : (pcSkillsList || []))
+    .map(function(x) { return (typeof x === 'object') ? (x.name || x.id || '') : String(x); });
+  var available = items.filter(function(item) {
+    return !existingNames.includes(item.name || item.id || '');
+  });
+  if (available.length === 0) {
+    var msg = items.length === 0
+      ? ('开发资源池中暂无 ' + (type === 'agent' ? 'Agent' : 'Skill'))
+      : '资源池中的项目已全部添加到团队';
+    poolListEl.innerHTML = '<div style="color:var(--tx-m);font-size:12px;padding:8px;text-align:center">' + msg + '</div>';
+    return;
+  }
+  var icon = type === 'agent' ? '🤖' : '🛠';
+  poolListEl.innerHTML = available.map(function(item) {
+    var name = item.name || item.id || 'Unknown';
+    var path = item.path || '';
+    var desc = item.description ? item.description.slice(0, 55) : (item.id || '');
+    return '<div class="pc-pool-item" data-path="' + escHtml(path) + '" onclick="pcPoolSelect(this)" title="' + escHtml(path) + '">'
+      + '<span style="font-size:13px;flex-shrink:0">' + icon + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div class="pc-pool-item-name">' + escHtml(name) + '</div>'
+      + (desc ? '<div class="pc-pool-item-desc">' + escHtml(desc) + '</div>' : '')
+      + '</div></div>';
+  }).join('');
+}
+
+// ── Agent 列表单击(tooltip) / 双击(浏览) ────────────────────
+function pcAgentItemClick(event, el) {
+  event.stopPropagation();
+  var tt = document.getElementById('pc-agent-tooltip');
+  if (tt && tt.style.display !== 'none' && tt._lastEl === el) {
+    tt.style.display = 'none'; return;
+  }
+  pcShowAgentTooltip(event, el);
+}
+
+function pcAgentItemDblClick(event, el) {
+  event.stopPropagation();
+  var tt = document.getElementById('pc-agent-tooltip');
+  if (tt) { tt.style.display = 'none'; clearTimeout(tt._hideTimer); }
+  var agentPath = el.dataset.path;
+  if (agentPath) pcOpenFile(agentPath);
+}
+
+function pcShowAgentTooltip(event, el) {
+  var agentName = el.dataset.name;
+  var agentPath = el.dataset.path;
+  var tt = document.getElementById('pc-agent-tooltip');
+  if (!tt) return;
+  tt._lastEl = el;
+
+  // 在全局 projectData 中查找完整元数据
+  var globalAgent = null;
+  if (projectData && projectData.agents) {
+    var fname = agentPath ? agentPath.split('/').pop() : '';
+    globalAgent = projectData.agents.find(function(a) {
+      return a.name === agentName || (a.path && a.path.split('/').pop() === fname);
+    });
+  }
+
+  document.getElementById('pc-agent-tt-name').textContent = agentName || '';
+  var roleEl = document.getElementById('pc-agent-tt-role');
+  roleEl.textContent = globalAgent ? (globalAgent.role || globalAgent.description || '') : (agentPath || '');
+
+  var chips = document.getElementById('pc-agent-tt-chips');
+  chips.innerHTML = '';
+  if (globalAgent) {
+    (globalAgent.skills || []).forEach(function(s) {
+      chips.innerHTML += '<span class="pc-tt-chip pc-tt-chip-s">' + escHtml(typeof s==='string'?s:(s.name||String(s))) + '</span>';
+    });
+    (globalAgent.tools || []).forEach(function(t) {
+      chips.innerHTML += '<span class="pc-tt-chip pc-tt-chip-t">' + escHtml(typeof t==='string'?t:(t.name||String(t))) + '</span>';
+    });
+    (globalAgent.rules || []).forEach(function(r) {
+      chips.innerHTML += '<span class="pc-tt-chip pc-tt-chip-r">' + escHtml(typeof r==='string'?r:(r.name||String(r))) + '</span>';
+    });
+    var kn = globalAgent.knowledge_areas || globalAgent.knowledge || [];
+    kn.forEach(function(k) {
+      chips.innerHTML += '<span class="pc-tt-chip pc-tt-chip-k">' + escHtml(typeof k==='string'?k:(k.name||String(k))) + '</span>';
+    });
+  }
+
+  // 定位 tooltip：优先显示在列表项右侧
+  var rect = el.getBoundingClientRect();
+  tt.style.display = 'block';
+  var left = rect.right + 10;
+  var top = rect.top - 4;
+  if (left + 290 > window.innerWidth) left = Math.max(4, rect.left - 295);
+  if (top + 220 > window.innerHeight) top = Math.max(4, window.innerHeight - 225);
+  tt.style.left = left + 'px';
+  tt.style.top = top + 'px';
+
+  clearTimeout(tt._hideTimer);
+  tt._hideTimer = setTimeout(function() { tt.style.display = 'none'; }, 6000);
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.pc-list-item') && !e.target.closest('#pc-agent-tooltip')) {
+    var tt = document.getElementById('pc-agent-tooltip');
+    if (tt) { tt.style.display = 'none'; clearTimeout(tt._hideTimer); }
+  }
+});
+
+// ── Skill 列表单击(tooltip) / 双击(浏览) ──────────────────────────────────
+function pcSkillItemClick(event, el) {
+  event.stopPropagation();
+  var tt = document.getElementById('pc-skill-tooltip');
+  if (tt && tt.style.display !== 'none' && tt._lastEl === el) {
+    tt.style.display = 'none'; return;
+  }
+  pcShowSkillTooltip(event, el);
+}
+
+function pcSkillItemDblClick(event, el) {
+  event.stopPropagation();
+  var tt = document.getElementById('pc-skill-tooltip');
+  if (tt) { tt.style.display = 'none'; clearTimeout(tt._hideTimer); }
+  var skillPath = el.dataset.path;
+  if (skillPath) pcOpenFile(skillPath + '/SKILL.md');
+}
+
+function pcShowSkillTooltip(event, el) {
+  var skillName = el.dataset.name;
+  var skillPath = el.dataset.path;
+  var tt = document.getElementById('pc-skill-tooltip');
+  if (!tt) return;
+  tt._lastEl = el;
+
+  // 从全局 projectData.skills 查找完整元数据
+  var globalSkill = null;
+  if (projectData && projectData.skills) {
+    globalSkill = projectData.skills.find(function(s) {
+      return s.name === skillName || (s.path && s.path === skillPath);
+    });
+  }
+
+  document.getElementById('pc-skill-tt-name').textContent = skillName || '';
+  var descEl = document.getElementById('pc-skill-tt-desc');
+  descEl.textContent = globalSkill ? (globalSkill.description || globalSkill.role || skillPath || '') : (skillPath || '');
+
+  var chips = document.getElementById('pc-skill-tt-chips');
+  chips.innerHTML = '';
+  if (globalSkill) {
+    // category / domain / subcategory
+    if (globalSkill.category) {
+      chips.innerHTML += '<span class="pc-sk-tt-chip pc-sk-tt-chip-cat">' + escHtml(globalSkill.category) + '</span>';
+    }
+    if (globalSkill.domain) {
+      chips.innerHTML += '<span class="pc-sk-tt-chip pc-sk-tt-chip-cat">' + escHtml(globalSkill.domain) + '</span>';
+    }
+    if (globalSkill.subcategory) {
+      chips.innerHTML += '<span class="pc-sk-tt-chip pc-sk-tt-chip-cat">' + escHtml(globalSkill.subcategory) + '</span>';
+    }
+    // use_cases (first 2)
+    var ucs = globalSkill.use_cases || [];
+    ucs.slice(0, 2).forEach(function(uc) {
+      chips.innerHTML += '<span class="pc-sk-tt-chip pc-sk-tt-chip-uc">' + escHtml(String(uc)) + '</span>';
+    });
+    // automotive_standards (first 2)
+    var stds = globalSkill.automotive_standards || [];
+    stds.slice(0, 2).forEach(function(std) {
+      chips.innerHTML += '<span class="pc-sk-tt-chip pc-sk-tt-chip-std">' + escHtml(String(std)) + '</span>';
+    });
+  }
+
+  // 定位 tooltip
+  var rect = el.getBoundingClientRect();
+  tt.style.display = 'block';
+  var left = rect.right + 10;
+  var top = rect.top - 4;
+  if (left + 300 > window.innerWidth) left = Math.max(4, rect.left - 305);
+  if (top + 230 > window.innerHeight) top = Math.max(4, window.innerHeight - 235);
+  tt.style.left = left + 'px';
+  tt.style.top = top + 'px';
+
+  clearTimeout(tt._hideTimer);
+  tt._hideTimer = setTimeout(function() { tt.style.display = 'none'; }, 6000);
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.skill-item') && !e.target.closest('#pc-skill-tooltip')) {
+    var tt = document.getElementById('pc-skill-tooltip');
+    if (tt) { tt.style.display = 'none'; clearTimeout(tt._hideTimer); }
+  }
+});
+
+function pcPoolSelect(el) {
+  var list = el.closest('[id$="-pool-list"]');
+  if (list) list.querySelectorAll('.pc-pool-item.selected').forEach(function(e) { e.classList.remove('selected'); });
+  el.classList.toggle('selected');
+}
+
+async function pcTeamDelete(type, name) {
+  pcConfirmDialog('确认移除 ' + name + '？此操作将从项目目录中删除该文件。', async function() {
+    try {
+      const isAgent  = type === 'agent';
+      const endpoint = isAgent
+        ? ('/api/projects/' + currentProjectId + '/agents/'  + encodeURIComponent(name))
+        : ('/api/projects/' + currentProjectId + '/skills/' + encodeURIComponent(name));
+      const res  = await fetch(endpoint, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
+      toast(name + ' 已移除', 's');
+      if (isAgent) { await pcLoadAgents(); pcTeamRefresh('agent'); }
+      else         { await pcLoadSkills(); pcTeamRefresh('skill'); }
+      pcLoadFileTree();
+    } catch(e) { toast('删除失败: ' + e.message, 'd'); }
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLI 扫描 & 团队目录 & 文件复制
+// ══════════════════════════════════════════════════════════════════════════════
+
+var pcSelectedCLI   = null;   // {id, name, folder}
+var pcCLIScanDone   = false;  // whether scan has been done once
+var pcCopyFileData  = [];     // current copy dialog file list
+var pcCopyAgentName = '';
+
+// ── CLI Scanner ──────────────────────────────────────────────────────────────
+
+function pcToggleCLIScanner() {
+  var dd = document.getElementById('pc-cli-dropdown');
+  if (!dd) return;
+  var isOpen = dd.style.display !== 'none';
+  if (isOpen) {
+    dd.style.display = 'none';
+  } else {
+    dd.style.display = 'block';
+    if (!pcCLIScanDone) pcScanCLI();
+  }
+  // Close dropdown when clicking outside
+  if (!isOpen) {
+    setTimeout(function() {
+      document.addEventListener('click', pcCLIOutsideClick, { once: true });
+    }, 100);
+  }
+}
+
+function pcCLIOutsideClick(e) {
+  var wrap = document.getElementById('pc-btn-scan-cli') && document.getElementById('pc-btn-scan-cli').parentElement;
+  if (wrap && !wrap.contains(e.target)) {
+    var dd = document.getElementById('pc-cli-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+}
+
+async function pcScanCLI() {
+  var listEl = document.getElementById('pc-cli-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--tx-m);font-size:11px">🔍 正在扫描...</div>';
+  try {
+    var res  = await fetch('/api/scan_cli');
+    var data = await res.json();
+    pcCLIScanDone = true;
+    window._pcLastCLITools = data.tools || [];
+    pcRenderCLIList(window._pcLastCLITools);
+  } catch(e) {
+    listEl.innerHTML = '<div style="padding:12px;color:var(--cr);font-size:11px">扫描失败: ' + e.message + '</div>';
+  }
+}
+
+function pcRenderCLIList(tools) {
+  var listEl = document.getElementById('pc-cli-list');
+  if (!listEl) return;
+  if (!tools.length) {
+    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:var(--tx-m);font-size:11px">未发现已安装的 CLI</div>';
+    return;
+  }
+  var statusLabel = { installed:'已安装', found:'已检测', config_found:'配置存在', not_found:'未安装' };
+  var statusColor = { installed:'var(--cs)', found:'var(--ct)', config_found:'var(--ca)', not_found:'var(--tx-m)' };
+  listEl.innerHTML = tools.map(function(t) {
+    var isSelected = pcSelectedCLI && pcSelectedCLI.id === t.id;
+    var dotCls = 'pc-cli-dot pc-cli-st-' + t.status;
+    var verStr = t.version ? ('<span style="font-size:9px;color:var(--tx-m);margin-left:auto">' + escHtml(t.version) + '</span>') : '';
+    var selMark = isSelected ? '<span style="color:var(--cs);font-size:12px;margin-left:auto">✓</span>' : verStr;
+    var stColor = statusColor[t.status] || 'var(--tx-m)';
+    return '<div class="pc-cli-item' + (isSelected ? ' selected' : '') + '"'
+      + ' onclick="pcSelectCLI(\'' + t.id + '\',\'' + escHtml(t.name) + '\',\'' + t.folder + '\')">'
+      + '<span class="' + dotCls + '"></span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:11px;font-weight:600">' + escHtml(t.name) + '</div>'
+      + '<div style="font-size:9px;color:' + stColor + '">'
+      + (statusLabel[t.status] || t.status)
+      + (t.path ? ' · ' + escHtml(t.path.split('/').pop()) : '')
+      + '</div></div>'
+      + selMark
+      + '</div>';
+  }).join('');
+}
+
+function pcSelectCLI(id, name, folder) {
+  if (!id) {
+    pcSelectedCLI = null;
+    var lb = document.getElementById('pc-cli-sel-label');
+    if (lb) { lb.textContent = ''; lb.style.display = 'none'; }
+    toast('已取消 CLI 选择', 'w');
+  } else {
+    // 若再次点击已选中项则取消选中（toggle）
+    if (pcSelectedCLI && pcSelectedCLI.id === id) {
+      pcSelectedCLI = null;
+      var lb = document.getElementById('pc-cli-sel-label');
+      if (lb) { lb.textContent = ''; lb.style.display = 'none'; }
+      toast('已取消 CLI 选择', 'w');
+    } else {
+      pcSelectedCLI = { id: id, name: name, folder: folder };
+      var lb = document.getElementById('pc-cli-sel-label');
+      if (lb) { lb.textContent = name; lb.style.display = 'inline'; }
+      toast('已选择 CLI: ' + name, 's');
+    }
+  }
+  // 下拉保持打开，重新渲染列表以更新勾选标记
+  if (window._pcLastCLITools && window._pcLastCLITools.length) {
+    pcRenderCLIList(window._pcLastCLITools);
+  }
+}
+
+async function pcSetupTeamDir(silent) {
+  if (!currentProjectId || !pcSelectedCLI) return;
+  try {
+    var res = await fetch('/api/projects/' + currentProjectId + '/setup_team_dir', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ folder: pcSelectedCLI.folder })
+    });
+    var data = await res.json();
+    if (data.error) {
+      if (!silent) toast('创建团队目录失败: ' + data.error, 'd');
+      return;
+    }
+    if (!silent || !data.already_existed) {
+      toast((data.already_existed ? '团队目录已存在' : '已创建团队目录') + ': ' + pcSelectedCLI.folder, 's');
+    }
+    pcLoadFileTree && pcLoadFileTree();
+  } catch(e) {
+    if (!silent) toast('创建团队目录失败: ' + e.message, 'd');
+  }
+}
+
+// ── Copy Files Dialog ────────────────────────────────────────────────────────
+
+async function pcShowCopyFilesModal(agentName) {
+  if (!currentProjectId || !pcSelectedCLI) return;
+  pcCopyAgentName = agentName;
+  var modal = document.getElementById('pc-copy-modal');
+  if (!modal) return;
+
+  // Set header info
+  document.getElementById('pc-copy-agent-nm').textContent  = agentName;
+  document.getElementById('pc-copy-target-dir').textContent = pcSelectedCLI.folder;
+  document.getElementById('pc-copy-file-list').innerHTML =
+    '<div style="padding:16px;text-align:center;color:var(--tx-m);font-size:11px">⏳ 正在获取关联文件...</div>';
+  modal.classList.add('open');
+
+  try {
+    var url = '/api/projects/' + currentProjectId + '/agent_related_files/' + encodeURIComponent(agentName)
+            + '?folder=' + encodeURIComponent(pcSelectedCLI.folder);
+    var res  = await fetch(url);
+    var data = await res.json();
+    if (data.error) {
+      document.getElementById('pc-copy-file-list').innerHTML =
+        '<div style="padding:12px;color:var(--cr);font-size:11px">获取失败: ' + data.error + '</div>';
+      return;
+    }
+    pcCopyFileData = data.files || [];
+    pcRenderCopyFileList(pcCopyFileData);
+    // Reset check-all
+    var ca = document.getElementById('pc-copy-check-all');
+    if (ca) ca.checked = true;
+  } catch(e) {
+    document.getElementById('pc-copy-file-list').innerHTML =
+      '<div style="padding:12px;color:var(--cr);font-size:11px">请求失败: ' + e.message + '</div>';
+  }
+}
+
+function pcRenderCopyFileList(files) {
+  var listEl = document.getElementById('pc-copy-file-list');
+  if (!listEl) return;
+  if (!files.length) {
+    listEl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--tx-m);font-size:11px">'
+      + '未找到关联文件（Agent 可能没有引用 skills/tools/rules/knowledge）</div>';
+    return;
+  }
+  var typeIcon = { agent:'🤖', skill:'⚙️', tool:'🔧', knowledge:'📚', rule:'📏' };
+  listEl.innerHTML = files.map(function(f, i) {
+    var hasConflict = f.exists;
+    var conflictBadge = hasConflict
+      ? '<span style="font-size:9px;color:var(--ct);background:#3d2e0040;border:1px solid #d2992250;'
+        + 'border-radius:3px;padding:1px 5px;flex-shrink:0">⚠️ 已存在</span>'
+      : '';
+    return '<div class="pc-copy-row' + (hasConflict ? ' conflict' : '') + '">'
+      + '<input type="checkbox" id="pc-copy-cb-' + i + '" checked style="flex-shrink:0">'
+      + '<span class="pc-copy-ft pc-ft-' + (f.type || 'agent') + '">'
+      + (typeIcon[f.type] || '📄') + ' ' + (f.type || 'file') + '</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      + escHtml(f.name) + '</div>'
+      + '<div style="font-size:9px;color:var(--tx-m);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      + escHtml(f.dst) + '</div>'
+      + '</div>'
+      + conflictBadge
+      + '</div>';
+  }).join('');
+}
+
+function pcCopyToggleAll(checked) {
+  var listEl = document.getElementById('pc-copy-file-list');
+  if (!listEl) return;
+  listEl.querySelectorAll('input[type=checkbox]').forEach(function(cb) { cb.checked = checked; });
+}
+
+async function pcConfirmCopyFiles() {
+  if (!currentProjectId || !pcSelectedCLI || !pcCopyFileData.length) return;
+  var files = pcCopyFileData.map(function(f, i) {
+    var cb = document.getElementById('pc-copy-cb-' + i);
+    if (!cb || !cb.checked) return null;
+    return { src: f.src, dst: f.dst, overwrite: true };
+  }).filter(Boolean);
+
+  if (!files.length) { toast('未选择任何文件', 'w'); return; }
+
+  var btn = document.getElementById('pc-copy-confirm-btn');
+  var sp  = document.getElementById('pc-copy-spinner');
+  if (btn) btn.style.pointerEvents = 'none';
+  if (sp)  sp.style.display = 'inline';
+
+  try {
+    var res  = await fetch('/api/projects/' + currentProjectId + '/copy_agent_files', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ folder: pcSelectedCLI.folder, files: files })
+    });
+    var data = await res.json();
+    var ok   = (data.results || []).filter(function(r){ return r.status === 'ok'; }).length;
+    var fail = (data.results || []).filter(function(r){ return r.status !== 'ok'; }).length;
+    toast('已复制 ' + ok + ' 个文件' + (fail ? '，' + fail + ' 个失败' : ''), ok > 0 ? 's' : 'd');
+    pcHideCopyModal();
+    pcLoadFileTree && pcLoadFileTree();
+  } catch(e) {
+    toast('复制失败: ' + e.message, 'd');
+  } finally {
+    if (btn) btn.style.pointerEvents = '';
+    if (sp)  sp.style.display = 'none';
+  }
+}
+
+function pcHideCopyModal() {
+  var modal = document.getElementById('pc-copy-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+
+// ── 通用确认对话框 ────────────────────────────────────────────────
+var _pcConfirmCb = null;
+function pcConfirmDialog(msg, cb, okLabel) {
+  document.getElementById('pc-confirm-msg').textContent = msg;
+  document.getElementById('pc-confirm-ok-btn').textContent = okLabel || '确认删除';
+  _pcConfirmCb = cb;
+  pcShowModal('pc-confirm-modal');
+}
+function pcConfirmOK() {
+  pcHideModal('pc-confirm-modal');
+  if (_pcConfirmCb) { var cb = _pcConfirmCb; _pcConfirmCb = null; cb(); }
+}
+function pcConfirmCancel() {
+  _pcConfirmCb = null;
+  pcHideModal('pc-confirm-modal');
+}
 </script>
 
+
+<!-- Agent 属性悬浮卡 -->
+<div id="pc-agent-tooltip" style="position:fixed;z-index:950;display:none;
+  background:#0e1a2a;border:1px solid #2a4a7a;border-radius:8px;
+  padding:10px 12px;box-shadow:0 8px 32px rgba(0,0,0,.7);
+  min-width:200px;max-width:280px;pointer-events:none">
+  <div id="pc-agent-tt-name" style="font-size:12px;font-weight:700;color:#7eb8ff;margin-bottom:3px"></div>
+  <div id="pc-agent-tt-role" style="font-size:10px;color:var(--tx-s);margin-bottom:6px;line-height:1.4;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"></div>
+  <div id="pc-agent-tt-chips" style="display:flex;flex-wrap:wrap;gap:3px"></div>
+  <div style="font-size:10px;color:var(--tx-m);margin-top:7px;border-top:1px solid #1e3050;padding-top:5px">
+    💡 双击进入文件浏览
+  </div>
+</div>
+<!-- Skill 属性悬浮卡 -->
+<div id="pc-skill-tooltip" style="position:fixed;z-index:951;display:none;
+  background:#0e1a2a;border:1px solid #2a5a3a;border-radius:8px;
+  padding:10px 12px;box-shadow:0 8px 32px rgba(0,0,0,.7);
+  min-width:200px;max-width:290px;pointer-events:none">
+  <div id="pc-skill-tt-name" style="font-size:12px;font-weight:700;color:#5de070;margin-bottom:3px"></div>
+  <div id="pc-skill-tt-desc" style="font-size:10px;color:var(--tx-s);margin-bottom:6px;line-height:1.4;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden"></div>
+  <div id="pc-skill-tt-chips" style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px"></div>
+  <div style="font-size:10px;color:var(--tx-m);margin-top:7px;border-top:1px solid #1e3050;padding-top:5px">
+    💡 双击进入文件浏览
+  </div>
+</div>
+<!-- Agent 关联文件复制对话框 -->
+<div id="pc-copy-modal">
+  <div style="background:#0d1b2e;border:1px solid #2a4a7a;border-radius:12px;
+    width:min(520px,94vw);max-height:82vh;display:flex;flex-direction:column;
+    box-shadow:0 20px 80px rgba(0,0,0,.85);animation:mIn .18s ease">
+    <div style="display:flex;align-items:center;padding:13px 18px;border-bottom:1px solid #1e3050;gap:8px;flex-shrink:0">
+      <span style="font-size:16px">📋</span>
+      <div style="flex:1;font-size:13px;font-weight:700;color:#7eb8ff">将关联文件复制到团队目录</div>
+      <button onclick="pcHideCopyModal()" style="background:none;border:none;color:var(--tx-m);
+        font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px;transition:.15s;line-height:1"
+        onmouseover="this.style.color='#f85149'" onmouseout="this.style.color='var(--tx-m)'">✕</button>
+    </div>
+    <div style="padding:9px 18px;font-size:11px;color:var(--tx-s);border-bottom:1px solid #1e3050;flex-shrink:0">
+      Agent: <span id="pc-copy-agent-nm" style="color:#7eb8ff;font-weight:700"></span>
+      &nbsp;→&nbsp;
+      <span id="pc-copy-target-dir" style="color:#5de070;font-family:monospace;font-size:10px"></span>
+    </div>
+    <div style="padding:6px 18px;font-size:10px;color:var(--tx-m);border-bottom:1px solid #1e3050;flex-shrink:0">
+      ⚠️ 橙色标注的文件在目标路径已存在，勾选后将覆盖。
+    </div>
+    <div id="pc-copy-file-list" style="flex:1;overflow-y:auto;padding:10px 18px;
+      display:flex;flex-direction:column;gap:5px;min-height:60px">
+    </div>
+    <div style="padding:11px 18px;border-top:1px solid #1e3050;display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tx-s);cursor:pointer;flex:1">
+        <input type="checkbox" id="pc-copy-check-all" checked onchange="pcCopyToggleAll(this.checked)">
+        <span>全选 / 全不选</span>
+      </label>
+      <button onclick="pcHideCopyModal()"
+        style="background:var(--bg-card2);border:1px solid var(--border);color:var(--tx-s);
+        padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:.15s"
+        onmouseover="this.style.color='var(--tx-p)'" onmouseout="this.style.color='var(--tx-s)'">跳过</button>
+      <button onclick="pcConfirmCopyFiles()" id="pc-copy-confirm-btn"
+        style="background:#1a4a3a;border:1px solid #3fb95060;color:#5de070;
+        padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;
+        display:flex;align-items:center;gap:5px;transition:.15s"
+        onmouseover="this.style.background='#1e5a47'" onmouseout="this.style.background='#1a4a3a'">
+        <span id="pc-copy-spinner" style="display:none">⏳</span> ✓ 确认复制
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用操作确认对话框 -->
+<div class="pc-modal-overlay hidden" id="pc-confirm-modal" onclick="if(event.target===this)pcConfirmCancel()">
+  <div class="pc-modal-box" style="width:min(380px,96vw)">
+    <div class="pc-modal-hdr">
+      <span>⚠️</span>
+      <span class="pc-modal-title">确认操作</span>
+      <button class="pc-modal-close" onclick="pcConfirmCancel()">✕</button>
+    </div>
+    <div class="pc-modal-body" style="padding:18px 20px">
+      <p id="pc-confirm-msg" style="color:var(--tx-p);margin:0;line-height:1.6;white-space:pre-wrap"></p>
+    </div>
+    <div class="pc-modal-footer">
+      <button class="pc-btn-cancel" onclick="pcConfirmCancel()">取消</button>
+      <button class="pc-btn-danger" id="pc-confirm-ok-btn" onclick="pcConfirmOK()">确认删除</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

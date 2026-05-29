@@ -58,9 +58,8 @@ category: <domain-category>
 domain: automotive
 subcategory: <specific-area>
 
-description: >
-  <2-3 句说明 Skill 做什么、核心能力是什么、适用什么汽车场景>
-
+description: <2-3 句说明 Skill 做什么、核心能力是什么、适用什么汽车场景>
+ 
 use_cases:
   - "<具体触发场景 1>"
   - "<具体触发场景 2>"

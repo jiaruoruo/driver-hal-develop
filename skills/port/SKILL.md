@@ -5,10 +5,9 @@ category: mcal-driver
 domain: automotive
 subcategory: gpio-port
 
-description: >
-  专注于 AUTOSAR PORT/DIO 驱动模块开发，覆盖 GPIO 引脚方向配置、
-  驱动强度设置、上下拉电阻选择、复用功能分配与数字 I/O 读写，
-  确保符合 AUTOSAR SWS_Port/SWS_Dio 规范与 ISO 26262 要求。
+description: 专注于 AUTOSAR PORT/DIO 驱动模块开发，覆盖 GPIO 引脚方向配置、
+  驱动强度设置、上下拉电阻选择、复用功能分配与数字 I/O 读写，确保符合 AUTOSAR SWS_Port/SWS_Dio 规范与 ISO 26262 要求。
+  
 
 use_cases:
   - "配置 GPIO 引脚方向（输入/输出/双向）与驱动强度"
