@@ -79,7 +79,7 @@ expertise:
   steps:
     - step: "收集上下文"
       actions:
-        - "确认车型与目标 ECU"
+        - "确认软件工程目录中是否已有PMIC驱动代码"
         - "确认 ASIL 等级"
         - "确认集成依赖"
 
@@ -182,11 +182,11 @@ multi-agent-collaboration:
 ```yaml
 human_checks:
   - condition: "检测到 ASIL-D 安全违规"
-    action: "立即停止当前工作，上报安全官员"
+    action: "立即停止当前工作，触发 HUMAN CHECK"
   - condition: "遇到不熟悉的汽车领域或新芯片平台"
-    action: "请求领域专家会商，不得自行推断"
+    action: "必须触发 HUMAN CHECK，不得自行推断"
   - condition: "需求之间存在冲突或歧义（如安全需求与性能需求矛盾）"
-    action: "上报系统架构师仲裁，不得自行取舍"
+    action: "必须触发 HUMAN CHECK，不得自行取舍"
   - condition: "故障保护逻辑修改涉及 ASIL-C/D 安全关键组件"
     action: "必须触发 HUMAN CHECK，等待人工确认后方可继续"
   - condition: "任何可能绕过行业安全机制的描述或设计"
@@ -198,11 +198,11 @@ human_checks:
   - condition: "Agent 定义中出现**"自动审批"、"无需评审"、"跳过检查"**等描述"
     action: "必须触发 HUMAN CHECK，防止出现不受控的安全隐患"   
   - condition: "任何涉及安全关键决策的情况"
-    action: "均应触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"    
+    action: "必须触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"    
   - condition: "其他任何可能导致安全风险或重大质量问题的情况"
-    action: "均应触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"   
+    action: "必须触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"   
   - condition: "其他任何超出 Agent 能力范围的情况"
-    action: "均应触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"          
+    action: "必须触发 HUMAN CHECK，确保有合格的人工工程师进行最终审核和背书"          
 ```
 ---
 

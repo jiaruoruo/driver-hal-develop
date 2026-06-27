@@ -1410,6 +1410,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
       <button class="tab" data-tab="tools"   onclick="switchTab('tools')">
         🔧 Tools <span class="tab-count" id="cnt-tools">-</span>
       </button>
+      <button class="tab" data-tab="soul"    onclick="switchTab('soul')">
+        🧿 Soul <span class="tab-count" id="cnt-soul">4</span>
+      </button>
     </div>
     <div id="tab-agents"    class="tab-panel active"><div class="cards" id="cards-agents"></div></div>
     <div id="tab-skills"    class="tab-panel" style="padding:0;overflow:hidden">
@@ -1424,6 +1427,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--tx-p);
     <div id="tab-rules"     class="tab-panel"><div class="cards" id="cards-rules"></div></div>
     <div id="tab-knowledge" class="tab-panel"><div class="cards" id="cards-knowledge"></div></div>
     <div id="tab-tools"     class="tab-panel"><div class="cards" id="cards-tools"></div></div>
+    <div id="tab-soul"      class="tab-panel"><div class="cards" id="cards-soul"></div></div>
   </section>
 
   <!-- ── ROUTING (下方：路由关系) ── -->
@@ -2654,6 +2658,25 @@ function renderTools(tools) {
       <div class="ccard-path">${t.path}</div>
     </div>`;
   }).join('');
+}
+
+function renderSoul() {
+  const el = document.getElementById('cards-soul');
+  const SOUL_ITEMS = [
+    { id: 'CLAUDE',          file: 'CLAUDE.md',          icon: '🧠', name: 'CLAUDE.md',          desc: '第一性原理 — 项目整体设计原则与 Claude 行为指导' },
+    { id: 'agent-router',    file: 'agent-router.md',    icon: '🗺️', name: 'agent-router.md',    desc: 'Agent 路由总索引 — 指令关键词到 Agent 的映射规则' },
+    { id: 'skill-router',    file: 'skill-router.md',    icon: '🎯', name: 'skill-router.md',     desc: 'Skill 路由总索引 — Skill 能力映射与路由配置' },
+    { id: 'project-context', file: 'project-context.md', icon: '📌', name: 'project-context.md', desc: '项目上下文 — 全局上下文、项目背景与当前状态' },
+  ];
+  el.innerHTML = SOUL_ITEMS.map(item => `<div class="ccard" id="card-soul-${item.id}">
+      <div class="ccard-head">
+        <span class="ccard-icon">${item.icon}</span>
+        <span class="ccard-name">${item.name}</span>
+        <span class="ccard-status st-active">配置</span>
+      </div>
+      <div class="ccard-role">${item.desc}</div>
+      <div class="ccard-path">${item.file}</div>
+    </div>`).join('');
 }
 
 function toolDesc(id) {
@@ -6950,6 +6973,7 @@ async function doDeleteSkill() {
 
 /* ────────── Init ────────── */
 window.addEventListener('DOMContentLoaded', () => {
+  renderSoul();
   initSocket();
   setTimeout(() => {
     const el = document.getElementById('loading');
@@ -7374,8 +7398,8 @@ async function pcDoDeleteFile() {
     if (currentEditFile === path) pcCloseFile();
     toast('已删除: ' + path, 's');
     pcLoadFileTree();
-    if (path.startsWith('agents/')) pcLoadAgents();
-    if (path.startsWith('skills/')) pcLoadSkills();
+    if (path.startsWith('agents/') || path.includes('/agents/')) pcLoadAgents();
+    if (path.startsWith('skills/') || path.includes('/skills/')) pcLoadSkills();
   } catch(e) { toast('删除失败: ' + e.message, 'd'); }
 }
 
@@ -7483,7 +7507,8 @@ async function pcDoDelete() {
 async function pcLoadAgents() {
   if (!currentProjectId) return;
   try {
-    const res = await fetch('/api/projects/' + currentProjectId + '/agents');
+    var folderParam = pcSelectedCLI ? ('?folder=' + encodeURIComponent(pcSelectedCLI.folder)) : '';
+    const res = await fetch('/api/projects/' + currentProjectId + '/agents' + folderParam);
     const data = await res.json();
     pcAgentsList = data.agents || [];
     pcRenderAgentList(pcAgentsList);
@@ -7530,6 +7555,7 @@ async function pcDoAddAgent() {
     if (!url) { toast('请输入 GitHub URL', 'w'); return; }
     body = { source: 'github', url: url };
   }
+  if (pcSelectedCLI && pcSelectedCLI.folder) body.folder = pcSelectedCLI.folder;
   btn.disabled = true; spinner.style.display = 'inline-block';
   try {
     const res = await fetch('/api/projects/' + currentProjectId + '/add_agent', {
@@ -7548,7 +7574,8 @@ async function pcDoAddAgent() {
 async function pcDeleteAgent(agentName) {
   pcConfirmDialog('确认从项目中删除 Agent: ' + agentName + '？', async function() {
     try {
-      const res = await fetch('/api/projects/' + currentProjectId + '/agents/' + encodeURIComponent(agentName), { method: 'DELETE' });
+      var delAgentFolder = pcSelectedCLI ? ('?folder=' + encodeURIComponent(pcSelectedCLI.folder)) : '';
+      const res = await fetch('/api/projects/' + currentProjectId + '/agents/' + encodeURIComponent(agentName) + delAgentFolder, { method: 'DELETE' });
       const data = await res.json();
       if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
       toast('Agent "' + agentName + '" 已删除', 's');
@@ -7561,7 +7588,8 @@ async function pcDeleteAgent(agentName) {
 async function pcLoadSkills() {
   if (!currentProjectId) return;
   try {
-    const res = await fetch('/api/projects/' + currentProjectId + '/skills');
+    var folderParam2 = pcSelectedCLI ? ('?folder=' + encodeURIComponent(pcSelectedCLI.folder)) : '';
+    const res = await fetch('/api/projects/' + currentProjectId + '/skills' + folderParam2);
     const data = await res.json();
     pcSkillsList = data.skills || [];
     pcRefreshSkillsDisplay();
@@ -7646,6 +7674,7 @@ async function pcDoAddSkill() {
     if (!url) { toast('请输入 GitHub URL', 'w'); return; }
     body = { source: 'github', url: url };
   }
+  if (pcSelectedCLI && pcSelectedCLI.folder) body.folder = pcSelectedCLI.folder;
   btn.disabled = true; spinner.style.display = 'inline-block';
   try {
     const res = await fetch('/api/projects/' + currentProjectId + '/add_skill', {
@@ -7664,7 +7693,8 @@ async function pcDoAddSkill() {
 async function pcDeleteSkill(skillName) {
   pcConfirmDialog('确认从项目中删除 Skill: ' + skillName + '？\n（将删除 skills/' + skillName + '/ 整个目录）', async function() {
     try {
-      const res = await fetch('/api/projects/' + currentProjectId + '/skills/' + encodeURIComponent(skillName), { method: 'DELETE' });
+      var delSkillFolder = pcSelectedCLI ? ('?folder=' + encodeURIComponent(pcSelectedCLI.folder)) : '';
+      const res = await fetch('/api/projects/' + currentProjectId + '/skills/' + encodeURIComponent(skillName) + delSkillFolder, { method: 'DELETE' });
       const data = await res.json();
       if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
       toast('Skill "' + skillName + '" 已删除', 's');
@@ -7777,6 +7807,9 @@ function pcTeamRefresh(type) {
 }
 
 async function pcTeamAdd(type) {
+  if (!pcSelectedCLI || !pcSelectedCLI.folder) {
+    toast('请先在运行时 CLI 中选择一个工具', 'w'); return;
+  }
   const isAgent     = type === 'agent';
   const localPathId = 'pc-team-' + type + '-local-path';
   const githubUrlId = 'pc-team-' + type + '-github-url';
@@ -7803,19 +7836,31 @@ async function pcTeamAdd(type) {
   document.getElementById(btnId).disabled = true;
   document.getElementById(spinnerId).style.display = 'inline-block';
   try {
-    const endpoint = isAgent
-      ? ('/api/projects/' + currentProjectId + '/add_agent')
-      : ('/api/projects/' + currentProjectId + '/add_skill');
-    const res  = await fetch(endpoint, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(body)
-    });
-    const data = await res.json();
-    if (data.error) { toast('添加失败: ' + data.error, 'd'); return; }
-    toast((isAgent ? 'Agent' : 'Skill') + ' 已添加', 's');
-    if (isAgent && pcSelectedCLI && data.agent && data.agent.name) {
-      setTimeout(function(){ pcShowCopyFilesModal(data.agent.name); }, 400);
+    let res, data;
+    if (body.source !== 'github') {
+      // 部署到 CLI 团队目录（自动复制关联文件）
+      res = await fetch('/api/projects/' + currentProjectId + '/deploy_to_team', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ type: type, path: body.path, folder: pcSelectedCLI.folder })
+      });
+      data = await res.json();
+      if (data.error) { toast('部署失败: ' + data.error, 'd'); return; }
+      var okCount = (data.results || []).filter(function(r){ return r.status === 'ok'; }).length;
+      toast((isAgent ? 'Agent' : 'Skill') + ' 已部署到 ' + pcSelectedCLI.folder + '（' + okCount + ' 个文件）', 's');
+    } else {
+      // GitHub 来源：使用原有端点下载
+      const endpoint = isAgent
+        ? ('/api/projects/' + currentProjectId + '/add_agent')
+        : ('/api/projects/' + currentProjectId + '/add_skill');
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      });
+      data = await res.json();
+      if (data.error) { toast('添加失败: ' + data.error, 'd'); return; }
+      toast((isAgent ? 'Agent' : 'Skill') + ' 已添加', 's');
     }
     if (isLocal) document.getElementById(localPathId).value = '';
     var selEl = document.querySelector('#pc-team-' + type + '-pool-list .pc-pool-item.selected');
@@ -7823,7 +7868,7 @@ async function pcTeamAdd(type) {
     if (isAgent) { await pcLoadAgents(); pcTeamRefresh('agent'); pcTeamRefreshPool('agent'); }
     else         { await pcLoadSkills(); pcTeamRefresh('skill'); pcTeamRefreshPool('skill'); }
     pcLoadFileTree();
-  } catch(e) { toast('添加失败: ' + e.message, 'd'); }
+  } catch(e) { toast('部署失败: ' + e.message, 'd'); }
   finally {
     document.getElementById(btnId).disabled = false;
     document.getElementById(spinnerId).style.display = 'none';
@@ -8034,9 +8079,10 @@ async function pcTeamDelete(type, name) {
   pcConfirmDialog('确认移除 ' + name + '？此操作将从项目目录中删除该文件。', async function() {
     try {
       const isAgent  = type === 'agent';
+      var teamDelFolder = pcSelectedCLI ? ('?folder=' + encodeURIComponent(pcSelectedCLI.folder)) : '';
       const endpoint = isAgent
-        ? ('/api/projects/' + currentProjectId + '/agents/'  + encodeURIComponent(name))
-        : ('/api/projects/' + currentProjectId + '/skills/' + encodeURIComponent(name));
+        ? ('/api/projects/' + currentProjectId + '/agents/'  + encodeURIComponent(name) + teamDelFolder)
+        : ('/api/projects/' + currentProjectId + '/skills/' + encodeURIComponent(name) + teamDelFolder);
       const res  = await fetch(endpoint, { method: 'DELETE' });
       const data = await res.json();
       if (data.error) { toast('删除失败: ' + data.error, 'd'); return; }
@@ -8153,6 +8199,11 @@ function pcSelectCLI(id, name, folder) {
   // 下拉保持打开，重新渲染列表以更新勾选标记
   if (window._pcLastCLITools && window._pcLastCLITools.length) {
     pcRenderCLIList(window._pcLastCLITools);
+  }
+  // 切换 CLI 后刷新 agents/skills 列表（从新的 CLI 目录加载）
+  if (currentProjectId) {
+    pcLoadAgents();
+    pcLoadSkills();
   }
 }
 

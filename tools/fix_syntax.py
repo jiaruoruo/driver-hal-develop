@@ -1,42 +1,48 @@
 #!/usr/bin/env python3
-"""修复 server.py 中的语法错误：rstrip('/\') → rstrip('/\\')"""
-import sys
-sys.stdout.reconfigure(encoding='utf-8')
+# fix the syntax error: .replace("\", "/") → remove it
+path = 'd:/AI/myproject/driver-hal-develop/gui/server.py'
 
-SERVER_PY = r'd:\AI\myproject\driver-hal-develop\gui\server.py'
+with open(path, 'rb') as f:
+    raw = f.read()
 
-with open(SERVER_PY, 'r', encoding='utf-8') as f:
-    content = f.read()
+# The broken line contains the bytes for: .replace("\", "/")
+# In UTF-8: .replace("\ is 2e 72 65 70 6c 61 63 65 28 22 5c
+# We want to remove all occurrences of .replace("\\", "/").replace("\", "/")
+# and keep only .replace("\\", "/")
 
-# 修复：rstrip('/\') 是非法的，应该是 rstrip('/\\')
-old = "local_path = local_path.rstrip('/\\') + '_' + str(int(_t.time()))"
-new = "local_path = local_path.rstrip('/\\\\') + '_' + str(int(_t.time()))"
+# Use bytes-level replacement
+broken  = b'.replace("\\\\", "/").replace("\\", "/")'
+fixed   = b'.replace("\\\\", "/")'
+if broken in raw:
+    raw = raw.replace(broken, fixed)
+    print("Fixed: double replace removed")
+else:
+    # Try single backslash version
+    broken2 = b'.replace("\\", "/").replace("\\", "/")'
+    fixed2  = b'.replace("\\", "/")'
+    if broken2 in raw:
+        raw = raw.replace(broken2, fixed2)
+        print("Fixed: duplicate single replace removed")
+    else:
+        # Manually scan line 731 and fix it
+        lines = raw.split(b'\n')
+        for i, line in enumerate(lines):
+            if b'relative_to(project_path)' in line and b'.replace' in line:
+                # Remove everything after the first .replace("\\", "/")
+                print(f"Line {i+1}: {line[:120]}")
+                # Keep only up to first replace
+                idx = line.find(b'.replace("\\\\", "/")')
+                if idx >= 0:
+                    lines[i] = line[:idx] + b'.replace("\\\\", "/")'
+                    print(f"Fixed line {i+1}")
+                else:
+                    # Try another pattern
+                    idx2 = line.find(b'.replace("\\", "/")')
+                    if idx2 >= 0:
+                        lines[i] = line[:idx2] + b'.replace("\\\\", "/")'
+                        print(f"Fixed line {i+1} (single bs)")
+        raw = b'\n'.join(lines)
 
-# 实际上在 Python 源码中 '/\' 应该是 '/\\' (两个字符: slash, backslash)
-# 让我直接用字节来检查
-print("File size:", len(content))
-
-# 找到并显示第 946 行附近内容
-lines = content.split('\n')
-print(f"Line 944: {repr(lines[943])}")
-print(f"Line 945: {repr(lines[944])}")
-print(f"Line 946: {repr(lines[945])}")
-print(f"Line 947: {repr(lines[946])}")
-
-# 修复：将 .rstrip('/\') 替换为 .rstrip('/\\')
-# 在文件中实际存储的可能是 rstrip('/\') (3 chars inside quotes)
-import re
-
-# 找到包含 rstrip 和时间戳的那行
-for i, line in enumerate(lines):
-    if 'rstrip' in line and 'time' in line and 'local_path' in line:
-        print(f"\nFound at line {i+1}: {repr(line)}")
-        # 修复这一行
-        fixed_line = re.sub(r"\.rstrip\(['\"].*?['\"]\)", ".rstrip('/\\\\')", line)
-        print(f"Fixed: {repr(fixed_line)}")
-        lines[i] = fixed_line
-
-fixed_content = '\n'.join(lines)
-with open(SERVER_PY, 'w', encoding='utf-8') as f:
-    f.write(fixed_content)
-print("\n[OK] 已修复并保存")
+with open(path, 'wb') as f:
+    f.write(raw)
+print("DONE")

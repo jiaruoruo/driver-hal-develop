@@ -687,27 +687,30 @@ class ProjectManager:
 
     # ── Agent 管理 ────────────────────────────────────────────────────────────
 
-    def list_agents(self, project_id: str) -> list:
-        """列出项目 agents/ 目录的所有 .md 文件。"""
+    def list_agents(self, project_id: str, folder: str = "") -> list:
+        """列出项目中的 agent .md 文件。
+        folder 指定时在 <project>/<folder>/agents/ 下查找，否则在项目根目录查找。
+        """
         project = self.get_project(project_id)
         if not project:
             return []
-        agents_dir = Path(project["path"]) / "agents"
-        if not agents_dir.exists():
+        project_path = Path(project["path"])
+        search_dir = (project_path / folder / "agents") if folder else project_path
+        if not search_dir.exists():
             return []
         result = []
-        for f in sorted(agents_dir.glob("*.md")):
+        for f in sorted(search_dir.glob("*.md")):
             result.append({
                 "name": f.stem,
                 "filename": f.name,
-                "path": f"agents/{f.name}",
+                "path": f.name,
                 "size": f.stat().st_size,
                 "modified": f.stat().st_mtime,
             })
         return result
 
-    def add_agent_local(self, project_id: str, src_path: str) -> dict:
-        """复制本地 agent .md 文件到项目 agents/ 目录。"""
+    def add_agent_local(self, project_id: str, src_path: str, folder: str = "") -> dict:
+        """复制本地 agent .md 文件到项目目录（folder 指定时放入 <folder>/agents/）。"""
         project = self.get_project(project_id)
         if not project:
             raise ValueError("项目不存在")
@@ -716,15 +719,20 @@ class ProjectManager:
             raise ValueError(f"文件不存在: {src_path}")
         if src.suffix.lower() != ".md":
             raise ValueError("Agent 文件必须是 .md 格式")
-        agents_dir = Path(project["path"]) / "agents"
-        agents_dir.mkdir(exist_ok=True)
-        dest = agents_dir / src.name
+        project_path = Path(project["path"])
+        if folder:
+            dest_dir = project_path / folder / "agents"
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / src.name
+        else:
+            dest = project_path / src.name
         shutil.copy2(src, dest)
         print(f"[PM] 添加 Agent (local): {src.name} → {dest}")
-        return {"name": src.stem, "path": f"agents/{src.name}"}
+        rel = str(dest.relative_to(project_path)).replace("\\", "/")
+        return {"name": src.stem, "path": rel}
 
-    def add_agent_github(self, project_id: str, github_url: str) -> dict:
-        """从 GitHub URL 下载 agent .md 文件到项目 agents/ 目录。"""
+    def add_agent_github(self, project_id: str, github_url: str, folder: str = "") -> dict:
+        """从 GitHub URL 下载 agent .md 文件（folder 指定时放入 <folder>/agents/）。"""
         try:
             import requests as req
         except ImportError:
@@ -732,8 +740,7 @@ class ProjectManager:
         project = self.get_project(project_id)
         if not project:
             raise ValueError("项目不存在")
-        agents_dir = Path(project["path"]) / "agents"
-        agents_dir.mkdir(exist_ok=True)
+        project_path = Path(project["path"])
 
         raw_url = self._github_blob_to_raw(github_url)
         resp = req.get(raw_url, timeout=30)
@@ -741,21 +748,30 @@ class ProjectManager:
         filename = raw_url.rstrip("/").split("/")[-1]
         if not filename.lower().endswith(".md"):
             filename += ".md"
-        dest = agents_dir / filename
+        if folder:
+            dest_dir = project_path / folder / "agents"
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            dest = dest_dir / filename
+        else:
+            dest = project_path / filename
         dest.write_bytes(resp.content)
         print(f"[PM] 添加 Agent (github): {filename}")
-        return {"name": dest.stem, "path": f"agents/{filename}"}
+        rel = str(dest.relative_to(project_path)).replace("\\", "/")
+        return {"name": dest.stem, "path": rel}
 
-    def delete_agent(self, project_id: str, agent_name: str):
-        """删除项目 agents/ 目录下指定的 agent 文件。"""
+    def delete_agent(self, project_id: str, agent_name: str, folder: str = ""):
+        """删除项目中指定的 agent 文件。
+        folder 指定时在 <project>/<folder>/agents/ 下查找，否则在项目根目录查找。
+        """
         project = self.get_project(project_id)
         if not project:
             raise ValueError("项目不存在")
-        agents_dir = Path(project["path"]) / "agents"
+        project_path = Path(project["path"])
+        search_dir = (project_path / folder / "agents") if folder else project_path
         # 支持带或不带 .md 扩展名
         for candidate in [
-            agents_dir / agent_name,
-            agents_dir / (agent_name + ".md"),
+            search_dir / agent_name,
+            search_dir / (agent_name + ".md"),
         ]:
             if candidate.exists():
                 candidate.unlink()
@@ -765,12 +781,15 @@ class ProjectManager:
 
     # ── Skill 管理 ────────────────────────────────────────────────────────────
 
-    def list_skills(self, project_id: str) -> list:
-        """列出项目 skills/ 目录下的所有 skill 子目录。"""
+    def list_skills(self, project_id: str, folder: str = "") -> list:
+        """列出项目中的 skill 子目录。
+        folder 指定时在 <project>/<folder>/skills/ 下查找，否则在 <project>/skills/ 下查找。
+        """
         project = self.get_project(project_id)
         if not project:
             return []
-        skills_dir = Path(project["path"]) / "skills"
+        project_path = Path(project["path"])
+        skills_dir = (project_path / folder / "skills") if folder else (project_path / "skills")
         if not skills_dir.exists():
             return []
         result = []
@@ -785,30 +804,37 @@ class ProjectManager:
                 })
         return result
 
-    def add_skill_local(self, project_id: str, src_path: str) -> dict:
-        """复制本地 skill 目录（或 SKILL.md 文件）到项目 skills/ 目录。"""
+    def add_skill_local(self, project_id: str, src_path: str, folder: str = "") -> dict:
+        """复制本地 skill 目录（或 SKILL.md 文件）到项目 skills/ 目录。
+        folder 指定时放入 <folder>/skills/ 下。"""
         project = self.get_project(project_id)
         if not project:
             raise ValueError("项目不存在")
         src = Path(src_path)
         if not src.exists():
             raise ValueError(f"路径不存在: {src_path}")
-        skills_dir = Path(project["path"]) / "skills"
-        skills_dir.mkdir(exist_ok=True)
+        project_path = Path(project["path"])
+        if folder:
+            skills_dir = project_path / folder / "skills"
+        else:
+            skills_dir = project_path / "skills"
+        skills_dir.mkdir(parents=True, exist_ok=True)
         if src.is_dir():
             dest = skills_dir / src.name
             if dest.exists():
                 shutil.rmtree(dest)
             shutil.copytree(src, dest)
-            print(f"[PM] 添加 Skill (local dir): {src.name}")
-            return {"name": src.name, "path": f"skills/{src.name}"}
+            print(f"[PM] 添加 Skill (local dir): {src.name} → {dest}")
+            rel_base = (folder + "/skills") if folder else "skills"
+            return {"name": src.name, "path": f"{rel_base}/{src.name}"}
         elif src.is_file() and src.name.upper() == "SKILL.MD":
             skill_name = src.parent.name
             dest_dir = skills_dir / skill_name
             dest_dir.mkdir(exist_ok=True)
             shutil.copy2(src, dest_dir / "SKILL.md")
-            print(f"[PM] 添加 Skill (local SKILL.md): {skill_name}")
-            return {"name": skill_name, "path": f"skills/{skill_name}"}
+            print(f"[PM] 添加 Skill (local SKILL.md): {skill_name} → {dest_dir}")
+            rel_base = (folder + "/skills") if folder else "skills"
+            return {"name": skill_name, "path": f"{rel_base}/{skill_name}"}
         else:
             raise ValueError("Skill 源路径需要是目录或 SKILL.md 文件")
 
@@ -832,12 +858,15 @@ class ProjectManager:
         print(f"[PM] 添加 Skill (github): {skill_name}")
         return {"name": skill_name, "path": f"skills/{skill_name}"}
 
-    def delete_skill(self, project_id: str, skill_name: str):
-        """删除项目 skills/ 目录下的 skill 子目录。"""
+    def delete_skill(self, project_id: str, skill_name: str, folder: str = ""):
+        """删除项目中的 skill 子目录。
+        folder 指定时在 <project>/<folder>/skills/ 下查找，否则在 <project>/skills/ 下查找。
+        """
         project = self.get_project(project_id)
         if not project:
             raise ValueError("项目不存在")
-        skill_dir = Path(project["path"]) / "skills" / skill_name
+        project_path = Path(project["path"])
+        skill_dir = (project_path / folder / "skills" / skill_name) if folder else (project_path / "skills" / skill_name)
         if skill_dir.exists() and skill_dir.is_dir():
             shutil.rmtree(skill_dir)
             print(f"[PM] 删除 Skill: {skill_name}")
@@ -2300,7 +2329,8 @@ def api_create_project_dir(project_id):
 @app.route("/api/projects/<project_id>/agents")
 def api_project_agents(project_id):
     """列出项目的所有 Agents。"""
-    return jsonify({"agents": project_manager.list_agents(project_id)})
+    folder = request.args.get("folder", "").strip()
+    return jsonify({"agents": project_manager.list_agents(project_id, folder)})
 
 
 @app.route("/api/projects/<project_id>/add_agent", methods=["POST"])
@@ -2308,25 +2338,36 @@ def api_add_project_agent(project_id):
     """向项目添加 Agent（本地文件复制或 GitHub URL 下载）。"""
     body = request.get_json(silent=True) or {}
     source = body.get("source", "local")
+    folder = body.get("folder", "").strip()
     try:
         if source == "local":
             src_path = body.get("path", "").strip()
             if not src_path:
                 return jsonify({"error": "path 为必填项"}), 400
-            result = project_manager.add_agent_local(project_id, src_path)
+            result = project_manager.add_agent_local(project_id, src_path, folder)
         elif source == "github":
             url = body.get("url", "").strip()
             if not url:
                 return jsonify({"error": "url 为必填项"}), 400
-            result = project_manager.add_agent_github(project_id, url)
+            result = project_manager.add_agent_github(project_id, url, folder)
         elif source == "pool":
             rel_path = body.get("path", "").strip()
             if not rel_path:
                 return jsonify({"error": "path 为必填项"}), 400
             src_path = str(PROJECT_ROOT / rel_path)
-            result = project_manager.add_agent_local(project_id, src_path)
+            result = project_manager.add_agent_local(project_id, src_path, folder)
         else:
             return jsonify({"error": "source 必须为 local、github 或 pool"}), 400
+        # 如果指定了 folder，自动拷贝关联 skills/tools/knowledge/rules
+        if folder:
+            try:
+                project = project_manager.get_project(project_id)
+                if project:
+                    _agent_full = str(Path(project["path"]) / result["path"])
+                    _team_dir   = Path(project["path"]) / folder
+                    _copy_related_files(_agent_full, _team_dir)
+            except Exception:
+                pass
         return jsonify({"status": "ok", "agent": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2335,8 +2376,9 @@ def api_add_project_agent(project_id):
 @app.route("/api/projects/<project_id>/agents/<agent_name>", methods=["DELETE"])
 def api_delete_project_agent(project_id, agent_name):
     """删除项目中的指定 Agent。"""
+    folder = request.args.get("folder", "").strip()
     try:
-        project_manager.delete_agent(project_id, agent_name)
+        project_manager.delete_agent(project_id, agent_name, folder)
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2345,7 +2387,8 @@ def api_delete_project_agent(project_id, agent_name):
 @app.route("/api/projects/<project_id>/skills")
 def api_project_skills(project_id):
     """列出项目的所有 Skills。"""
-    return jsonify({"skills": project_manager.list_skills(project_id)})
+    folder = request.args.get("folder", "").strip()
+    return jsonify({"skills": project_manager.list_skills(project_id, folder)})
 
 
 @app.route("/api/projects/<project_id>/add_skill", methods=["POST"])
@@ -2353,25 +2396,36 @@ def api_add_project_skill(project_id):
     """向项目添加 Skill（本地目录复制或 GitHub URL 下载）。"""
     body = request.get_json(silent=True) or {}
     source = body.get("source", "local")
+    folder = body.get("folder", "").strip()
     try:
         if source == "local":
             src_path = body.get("path", "").strip()
             if not src_path:
                 return jsonify({"error": "path 为必填项"}), 400
-            result = project_manager.add_skill_local(project_id, src_path)
+            result = project_manager.add_skill_local(project_id, src_path, folder)
         elif source == "github":
             url = body.get("url", "").strip()
             if not url:
                 return jsonify({"error": "url 为必填项"}), 400
-            result = project_manager.add_skill_github(project_id, url)
+            result = project_manager.add_skill_github(project_id, url, folder)
         elif source == "pool":
             rel_path = body.get("path", "").strip()
             if not rel_path:
                 return jsonify({"error": "path 为必填项"}), 400
             src_path = str(PROJECT_ROOT / rel_path)
-            result = project_manager.add_skill_local(project_id, src_path)
+            result = project_manager.add_skill_local(project_id, src_path, folder)
         else:
             return jsonify({"error": "source 必须为 local、github 或 pool"}), 400
+        # 如果指定了 folder，自动拷贝关联 tools/knowledge/rules
+        if folder:
+            try:
+                project = project_manager.get_project(project_id)
+                if project:
+                    _skill_md = str(Path(project["path"]) / result["path"] / "SKILL.md")
+                    _team_dir = Path(project["path"]) / folder
+                    _copy_related_files(_skill_md, _team_dir)
+            except Exception:
+                pass
         return jsonify({"status": "ok", "skill": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2380,8 +2434,9 @@ def api_add_project_skill(project_id):
 @app.route("/api/projects/<project_id>/skills/<skill_name>", methods=["DELETE"])
 def api_delete_project_skill(project_id, skill_name):
     """删除项目中的指定 Skill。"""
+    folder = request.args.get("folder", "").strip()
     try:
-        project_manager.delete_skill(project_id, skill_name)
+        project_manager.delete_skill(project_id, skill_name, folder)
         return jsonify({"status": "ok"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2555,6 +2610,117 @@ def api_setup_team_dir(project_id):
         return jsonify({"error": str(e)}), 500
 
 
+
+@app.route("/api/projects/<project_id>/deploy_to_team", methods=["POST"])
+def api_deploy_to_team(project_id):
+    """将 agent 或 skill 及其关联文件自动部署到 CLI 团队目录。
+    
+    请求体: {type: "agent"|"skill", path: "<相对于PROJECT_ROOT的路径>", folder: "<CLI目录名>"}
+    - agent: 复制 .md 到 <team_dir>/agents/，并复制关联的 skills/tools/knowledge/rules
+    - skill: 复制目录到 <team_dir>/skills/，并复制关联的 tools/knowledge/rules
+    """
+    body        = request.get_json(silent=True) or {}
+    res_type    = body.get("type", "agent")
+    rel_path    = body.get("path", "").strip()
+    folder_name = body.get("folder", "").strip()
+
+    if not rel_path:
+        return jsonify({"error": "path 为必填项"}), 400
+    if not folder_name:
+        return jsonify({"error": "folder 为必填项"}), 400
+
+    project = project_manager.get_project(project_id)
+    if not project:
+        return jsonify({"error": "项目不存在"}), 404
+
+    project_path = Path(project["path"])
+    team_dir     = project_path / folder_name
+
+    # 解析源路径（相对于 PROJECT_ROOT 或绝对路径）
+    src = PROJECT_ROOT / rel_path
+    if not src.exists():
+        src = Path(rel_path)
+    if not src.exists():
+        return jsonify({"error": f"源路径不存在: {rel_path}"}), 400
+
+    results = []
+
+    def copy_to_team(src_p, dst_rel):
+        dst = team_dir / dst_rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if src_p.is_dir():
+                shutil.copytree(str(src_p), str(dst), dirs_exist_ok=True)
+            else:
+                shutil.copy2(str(src_p), str(dst))
+            results.append({"src": str(src_p), "dst": dst_rel, "status": "ok"})
+            print(f"[DEPLOY] {src_p.name} → {dst_rel}")
+        except Exception as e:
+            results.append({"src": str(src_p), "dst": dst_rel,
+                             "status": "error", "error": str(e)})
+
+    def deploy_related(content_str):
+        """解析 frontmatter，复制关联 skills/tools/knowledge/rules。"""
+        fm_match = re.match(r'^---\s*\n(.*?)\n---', content_str, re.DOTALL)
+        if not fm_match:
+            return
+        try:
+            fm = yaml.safe_load(fm_match.group(1)) or {}
+        except Exception:
+            return
+        for ref in (fm.get("skills", []) or []):
+            p = _resolve_ref_path(ref, "skills")
+            if p:
+                copy_to_team(p, f"skills/{p.name}")
+        for ref in (fm.get("tools", []) or []):
+            p = _resolve_ref_path(ref, "tools")
+            if p:
+                copy_to_team(p, f"tools/{p.name}")
+        for ref in (fm.get("knowledge", []) or []):
+            p = _resolve_ref_path(ref, "knowledge")
+            if p:
+                copy_to_team(p, f"knowledge/{p.name}")
+        for ref in (fm.get("rules", []) or []):
+            p = _resolve_ref_path(ref, "rules")
+            if p:
+                copy_to_team(p, f"rules/{p.name}")
+
+    if res_type == "agent":
+        if src.suffix.lower() != ".md":
+            return jsonify({"error": "Agent 文件必须是 .md 格式"}), 400
+        copy_to_team(src, f"agents/{src.name}")
+        try:
+            content = src.read_text(encoding="utf-8")
+            deploy_related(content)
+        except Exception as e:
+            results.append({"status": "parse_error", "error": str(e)})
+        return jsonify({
+            "status": "ok",
+            "agent": {"name": src.stem, "path": f"agents/{src.name}"},
+            "results": results,
+        })
+
+    elif res_type == "skill":
+        skill_dir  = src if src.is_dir() else src.parent
+        skill_name = skill_dir.name
+        copy_to_team(skill_dir, f"skills/{skill_name}")
+        skill_md = skill_dir / "SKILL.md"
+        if skill_md.exists():
+            try:
+                content = skill_md.read_text(encoding="utf-8")
+                deploy_related(content)
+            except Exception as e:
+                results.append({"status": "parse_error", "error": str(e)})
+        return jsonify({
+            "status": "ok",
+            "skill": {"name": skill_name, "path": f"skills/{skill_name}"},
+            "results": results,
+        })
+
+    else:
+        return jsonify({"error": "type 必须为 agent 或 skill"}), 400
+
+
 def _resolve_ref_path(ref, subdir):
     """Resolve a reference to an absolute Path, or None."""
     if not ref:
@@ -2568,7 +2734,99 @@ def _resolve_ref_path(ref, subdir):
     return None
 
 
-@app.route("/api/projects/<project_id>/agent_related_files/<agent_name>")
+def _copy_related_files(md_path: str, team_dir) -> list:
+    """解析 .md 文件的 frontmatter 和正文各章节 YAML 代码块，
+    将引用的 skills / tools / knowledge / rules 文件自动复制到 team_dir 对应子目录。"""
+    results = []
+    try:
+        content = Path(md_path).read_text(encoding='utf-8')
+    except Exception:
+        return results
+
+    def _copy_dep(src_p, dst_rel):
+        dst = Path(team_dir) / dst_rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if src_p.is_dir():
+                shutil.copytree(str(src_p), str(dst), dirs_exist_ok=True)
+            else:
+                shutil.copy2(str(src_p), str(dst))
+            results.append({'src': str(src_p), 'dst': dst_rel, 'status': 'ok'})
+            print(f"[DEP] {src_p.name} -> {dst_rel}")
+        except Exception as exc:
+            results.append({'src': str(src_p), 'dst': dst_rel,
+                            'status': 'error', 'error': str(exc)})
+
+    def _try_copy(ref, subdir):
+        """根据 ref 字符串解析路径并复制到 team_dir/<subdir>/。"""
+        if not ref or not isinstance(ref, str):
+            return
+        ref = ref.split('#')[0].strip()   # 去除行内注释
+        if not ref:
+            return
+        p = _resolve_ref_path(ref, subdir)
+        if p:
+            _copy_dep(p, f'{subdir}/{p.name}')
+
+    # ── 1. Frontmatter YAML ─────────────────────────────────────────────
+    fm = {}
+    fm_m = re.match(r'^---\s*\n(.*?)\n---', content, re.DOTALL)
+    if fm_m:
+        try:
+            fm = yaml.safe_load(fm_m.group(1)) or {}
+        except Exception:
+            fm = {}
+    for ref in (fm.get('skills', []) or []):
+        _try_copy(str(ref), 'skills')
+    for ref in (fm.get('tools', []) or []):
+        _try_copy(str(ref), 'tools')
+    for ref in (fm.get('knowledge', []) or []):
+        _try_copy(str(ref), 'knowledge')
+    for ref in (fm.get('rules', []) or []):
+        _try_copy(str(ref), 'rules')
+
+    # ── 2. 正文各 ```yaml``` 代码块 ──────────────────────────────────────
+    for block_str in re.findall(r'```yaml\s*\n(.*?)\n```', content, re.DOTALL):
+        try:
+            blk = yaml.safe_load(block_str)
+        except Exception:
+            continue
+        if not isinstance(blk, dict):
+            continue
+
+        # -- skills: [{skill: name}, ...]
+        for item in (blk.get('skills', []) or []):
+            ref = (item.get('skill', '') if isinstance(item, dict) else str(item))
+            _try_copy(ref, 'skills')
+
+        # -- tools: {required:[...], optional:[...]}  OR  tools: [...]
+        tools_val = blk.get('tools')
+        if isinstance(tools_val, dict):
+            tool_list = (tools_val.get('required', []) or []) + \
+                        (tools_val.get('optional', []) or [])
+        elif isinstance(tools_val, list):
+            tool_list = tools_val
+        else:
+            tool_list = []
+        for ref in tool_list:
+            _try_copy(str(ref) if ref else '', 'tools')
+
+        # -- rules: [{rule: path}, ...]
+        for item in (blk.get('rules', []) or []):
+            ref = (item.get('rule', '') if isinstance(item, dict) else str(item))
+            _try_copy(ref, 'rules')
+
+        # -- knowledges / knowledge: [{source: path}, ...]
+        for key in ('knowledges', 'knowledge'):
+            for item in (blk.get(key, []) or []):
+                if isinstance(item, dict):
+                    ref = item.get('source') or item.get('path') or ''
+                else:
+                    ref = str(item)
+                _try_copy(ref, 'knowledge')
+
+    return results
+
 def api_agent_related_files(project_id, agent_name):
     """获取 Agent 的路由关联文件列表（含冲突检测）。"""
     folder = request.args.get("folder", "").strip()

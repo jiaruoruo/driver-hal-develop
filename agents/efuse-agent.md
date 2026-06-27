@@ -1,24 +1,24 @@
 ---
-name: test456
+name: efuse-agent
 version: 1.0.0
-type: specialist
+type: specialista
 domain: automotive
-role: 待填写 — Test456 的核心职责描述
+role: 待填写 — Efuse 的核心职责描述
 description: 请填写此 Agent 的功能描述，说明其专注领域、覆盖范围与核心价值。
 expertise:
-- 待填写专业领域 1
-- 待填写专业领域 2
+  - 待填写专业领域 1
+  - 待填写专业领域 2
 responsibilities:
-- 待填写职责 1
-- 待填写职责 2
+  - 待填写职责 1
+  - 待填写职责 2
 automotive_context:
   oem_level: Tier1
   lifecycle_phase: Development
   asil_range: QM ~ ASIL-B
   standards_compliance:
-  - ISO 26262 Part 6
-  - AUTOSAR Classic 4.x
-  - MISRA-C:2012
+    - ISO 26262 Part 6
+    - AUTOSAR Classic 4.x
+    - MISRA-C:2012
 ---
 
 ## workflows
@@ -81,8 +81,6 @@ workflows:
 skills:
   - skill: mcu
     proficiency: intermediate
-  - skill: skills/can/SKILL.md
-    proficiency: advanced
 ```
 
 ---
@@ -248,6 +246,7 @@ performance_metrics:
     target: 语句覆盖 ≥ 95%，MC/DC ≥ 90%（ASIL-B 要求）
   - metric: 交付效率
     target: 标准驱动模块开发周期 ≤ 3 个工作日
+
 ```
 
 ---
@@ -257,7 +256,7 @@ performance_metrics:
 ```yaml
 metadata:
   author: "Driver HAL Team"
-  created: "2026-05-28"
+  created: "2026-06-09"
   status: "active"
   priority: "high"
 
